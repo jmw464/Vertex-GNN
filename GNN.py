@@ -5,24 +5,23 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv, GCNConv
+from torch_geometric.nn import GATConv, GCNConv, SAGEConv
 from torch_geometric.data import Data, DataLoader
 import os,sys,math,glob,ROOT
 import numpy as np
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
+import matplotlib.pyplot as plt
+np.set_printoptions(threshold=sys.maxsize)
 
-max_entries = 100
+max_entries = 10000
 ngfeatures = 0 #number of features for graph
-nnfeatures = 10 #number of features per node
+nnfeatures = 7 #number of features per node
 nefeatures = 1 #number of features per edge
-nepochs = 5
+nepochs = 20
 
 trainp = .7
 testp = .2
 learning_rate = 0.01
-
-hid_feats = 100
-
 
 #create the edge list for a complete graph with n nodes
 def create_edge_list(n):
@@ -77,16 +76,16 @@ def evaluate(model, graph, features, labels, mask):
 class GCN(nn.Module):
     def __init__(self, in_features, hidden_features, out_features):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(in_features, hidden_features)
-        self.conv2 = GCNConv(hidden_features, out_features)#int(hidden_features/2))
+        self.conv1 = SAGEConv(in_features, out_features)
+        #self.conv2 = GCNConv(hidden_features, int(hidden_features/2))
         #self.conv3 = GCNConv(int(hidden_features/2), out_features)
 
     def forward(self, x, edge_index):
         # inputs are features of nodes
         h = self.conv1(x, edge_index)
         h = h.tanh()
-        h = self.conv2(h, edge_index)
-        h = h.tanh()
+        #h = self.conv2(h, edge_index)
+        #h = h.tanh()
         #h = self.conv3(h, edge_index)
         #h = h.tanh()
         return h
@@ -160,7 +159,7 @@ def main(argv):
             edge_features = np.zeros((nedges,nefeatures))
             vertex_positions = np.zeros((ntracks,3))
             truth_labels = np.zeros((nedges,1))
-            #print("event %d, jet %d with %d tracks"%(ientry, i, ntracks))
+            print("event %d, jet %d with %d tracks"%(ientry, i, ntracks))
         
             #read in features
             for j in range(ntracks):
@@ -175,7 +174,7 @@ def main(argv):
                 track_vx = entry.jet_trk_vtx_X[i][j]
                 track_vy = entry.jet_trk_vtx_Y[i][j]
                 track_vz = entry.jet_trk_vtx_Z[i][j]
-                node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, track_vx, track_vy, track_vz]
+                node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q]#, track_vx, track_vy, track_vz]
                 vertex_positions[j] = [track_vx, track_vy, track_vz]
 
             #calculate edge features
@@ -199,14 +198,17 @@ def main(argv):
                 g = Data(x=th.from_numpy(node_features), edge_index=e_index, edge_attr=th.from_numpy(edge_features), y=th.from_numpy(truth_labels), train_mask=th.from_numpy(tr_mask), val_mask=th.from_numpy(v_mask), test_mask=th.from_numpy(te_mask))
                 g_list.append(g)
 
-        if ientry > max_entries:
+        if ientry >= max_entries-1:
             break
+
+    print("TRUTH {}".format(np.sum(truth_labels)/np.size(truth_labels)))
 
     loader = DataLoader(g_list, batch_size=10, shuffle=True)
 
     model = EdgePredModel(nnfeatures, 64, 32)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     loss = nn.BCELoss()
+    loss_array = np.zeros(nepochs)
 
     for name, param in model.named_parameters():
         print(name, param.data, param.requires_grad)
@@ -221,6 +223,7 @@ def main(argv):
             out = loss(out[batch.train_mask].float(),batch.y[batch.train_mask].float())
             out.backward()
             opt.step()
+            loss_array[epoch] += out.item()/len(loader)
             print(out.item())
 
     correct = 0
@@ -233,13 +236,24 @@ def main(argv):
         true = batch.y.numpy().flatten().astype(int)
         mask = batch.test_mask.numpy()
         correct += np.sum(true[mask] == pred[mask])
+        print(true)
+        print(pred)
+        print(true[mask])
+        print(pred[mask])
         correct_ones += np.sum((true[mask] == 1) & (pred[mask] == 1))
         total += np.sum(mask)
         total_ones += np.sum(true[mask] == 1)
+        break
     acc = correct/total
     tpr = correct_ones/total_ones
     print('Accuracy: {:.4f}'.format(acc))
     print('True Positive Rate: {:.4f}'.format(tpr))
+
+    plt.ioff()
+    plt.plot(range(nepochs), loss_array, label="Training")
+    plt.legend()
+    plt.xlabel("Epoch")
+    plt.savefig("lossplot.png")
 
 if __name__ == '__main__':
     main(sys.argv)
