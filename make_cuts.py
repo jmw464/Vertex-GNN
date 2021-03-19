@@ -6,7 +6,7 @@ import h5py
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas, TTree
 np.set_printoptions(threshold=sys.maxsize)
 
-max_entries = 95000
+max_entries = 10000
 
 def check_event(entry):
     return True
@@ -48,6 +48,11 @@ def main(argv):
     tfeatures['z0'] = []
     tfeatures['q'] = []
 
+    efeatures = dict()
+    efeatures['event_vx'] = []
+    efeatures['event_vy'] = []
+    efeatures['event_vz'] = []
+
     labels = dict()
     labels['track_vx'] = []
     labels['track_vy'] = []
@@ -59,9 +64,14 @@ def main(argv):
 
         if check_event(entry):
             njets = entry.njets
+
+            efeatures['event_vx'].append(entry.truth_PVx)
+            efeatures['event_vy'].append(entry.truth_PVy)
+            efeatures['event_vz'].append(entry.truth_PVz)
+
             for i in range(njets):
                 ntracks =  entry.jet_trk_pt[i].size()
-                #print("event %d, jet %d with %d tracks"%(ientry, i, ntracks))
+                print("event %d, jet %d with %d tracks"%(ientry, i, ntracks))
 
                 jfeatures['pt'].append(entry.jet_pt[i])
                 jfeatures['eta'].append(entry.jet_eta[i])
@@ -98,6 +108,7 @@ def main(argv):
     grp_info = outfile.create_group("info")
     grp_tfeatures = outfile.create_group("tfeatures")
     grp_jfeatures = outfile.create_group("jfeatures")
+    grp_efeatures = outfile.create_group("efeatures")
     grp_labels = outfile.create_group("labels")
 
     for k in info.keys():
@@ -108,6 +119,9 @@ def main(argv):
     for k in jfeatures.keys():
         jfeatures[k] = np.asarray(jfeatures[k], dtype=np.double)
         grp_jfeatures.create_dataset(k, data = jfeatures[k])
+    for k in efeatures.keys():
+        efeatures[k] = np.asarray(efeatures[k], dtype=np.double)
+        grp_efeatures.create_dataset(k, data = efeatures[k])
     for k in labels.keys():
         grp_labels.create_dataset(k, data = labels[k])
 
