@@ -10,18 +10,20 @@ import numpy as np
 import h5py
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
 import matplotlib.pyplot as plt
+import time
 
 #th.set_printoptions(edgeitems=10000)
 np.set_printoptions(threshold=sys.maxsize)
 
 max_entries = 10
 ngfeatures = 0 #number of features for graph
-nnfeatures = 10 #number of features per node
+nnfeatures = 13 #number of features per node
 nefeatures = 1 #number of features per edge
 nepochs = 5
 
-trainp = .8
-testp = .2
+trainp = .7
+valp = .2
+testp = .1
 learning_rate = 0.01
 pos_weight = th.tensor([25]) #reweight positive labels since negatives outnumber positives by 25:1
 reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
@@ -81,6 +83,7 @@ def evaluate(model, graph, features, labels, mask):
 def main(argv):
     gROOT.SetBatch(True)
     
+    start_time = time.time()
     infile = h5py.File("/global/homes/j/jmw464/ATLAS/cuts.hdf5", "r")
     g_list = []
 
@@ -130,7 +133,7 @@ def main(argv):
             track_vx = infile['labels']['track_vx'][track_offset+j]
             track_vy = infile['labels']['track_vy'][track_offset+j]
             track_vz = infile['labels']['track_vz'][track_offset+j]
-            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
+            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi, track_vx, track_vy, track_vz]
             vertex_positions[j] = [track_vx, track_vy, track_vz]
         
         track_offset += ntracks
@@ -172,45 +175,76 @@ def main(argv):
             g = Data(x=th.from_numpy(node_features), edge_index=e_index, edge_attr=th.from_numpy(edge_features), y=th.from_numpy(truth_labels))#, train_mask=th.from_numpy(tr_mask), val_mask=th.from_numpy(v_mask), test_mask=th.from_numpy(te_mask)) 
             g_list.append(g)
 
+    print("Time: {}s".format(time.time() - start_time))
     print("TRUTH {}".format(total_ones/total_edges))
 
     train_list = g_list[:int(len(g_list)*trainp-1)]
-    test_list = g_list[int(len(g_list)*trainp-1):]
-    
+    val_list = g_list[int(len(g_list)*trainp-1):int(len(g_list)*(trainp+valp)-1)]
+    test_list = g_list[int(len(g_list)*(trainp+valp)-1):]
+
     device = th.device('cuda' if th.cuda.is_available() else 'cpu')
-    model = EdgePredModel(nnfeatures, 80, 160).to(device)
+    model = EdgePredModel(nnfeatures, 500, 100).to(device)
     
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(device)
-    loss_array = np.zeros(nepochs)
+    train_loss_array = np.zeros(nepochs)
+    val_loss_array = np.zeros(nepochs)
+    sig = nn.Sigmoid()
 
-    print(device)
+    print("Running on {}".format(device))
 
-    train_loader = DataLoader(train_list, batch_size=100, shuffle=True)
+    train_loader = DataLoader(train_list, batch_size=500, shuffle=True)
+    val_loader = DataLoader(val_list, batch_size = 100, shuffle=False)
     test_loader = DataLoader(test_list, batch_size=1, shuffle=False)
 
     for name, param in model.named_parameters():
         print(name, param.data, param.requires_grad)
+    print("")
 
     model = model.double()
-    model.train()
     for epoch in range(1,nepochs+1):
         print("Epoch: {}".format(epoch))
+        
+        #training loop
+        model.train()
         for batch in train_loader:
             batch = batch.to(device) #transfer batch to relevant device
             opt.zero_grad()
-            out = model(batch.x, batch.edge_index, device)
-            out = loss(out.float(),batch.y.float())
-            out.backward()
+            pred = model(batch.x, batch.edge_index, device)
+            l_pred = loss(pred.float(),batch.y.float())
+            opt.zero_grad()
+            l_pred.backward()
             opt.step()
-            print(out.item())
-            loss_array[epoch-1] += out.item()/len(train_loader)
+            print(l_pred.item())
+            train_loss_array[epoch-1] += l_pred.item()/len(train_loader)
 
+        #validation loop
+        model.eval()
+        tp = tn = fp = fn = 0
+        for batch in val_loader:
+            batch = batch.to(device)
+            pred = model(batch.x, batch.edge_index, device)
+            l_pred = loss(pred.float(),batch.y.float())
+            pred = sig(pred.float()).cpu().detach().numpy().flatten().round().astype(int)
+            true = batch.y.cpu().numpy().flatten().astype(int)
+            tp += np.sum((true == 1) & (pred == 1))
+            tn += np.sum((true == 0) & (pred == 0))
+            fp += np.sum((true == 0) & (pred == 1))
+            fn += np.sum((true == 1) & (pred == 0))
+            val_loss_array[epoch-1] += l_pred.item()/len(val_loader)
+        
+        print('Predicted: {} true, {} false; Truth: {} true, {} false'.format(tp+fp, tn+fn, tp+fn, tn+fp))
+        print('Accuracy: {:.4f}'.format((tp+tn)/(tp+tn+fp+fn)))
+        print('Fake Rate (1-Precision): {:.4f}'.format(1.-tp/(tp+fp)))
+        print("Time: {}s".format(time.time() - start_time))
+        print("")
+
+    #testing loop
     tp = tn = fp = fn = 0
     model.eval()
     for batch in test_loader:
         batch = batch.to(device)
-        pred = model(batch.x, batch.edge_index, device).cpu().detach().numpy().flatten().round().astype(int)
+        pred = sig(model(batch.x, batch.edge_index, device).float()).cpu().detach().numpy().flatten().round().astype(int)
         true = batch.y.cpu().numpy().flatten().astype(int)
         tp += np.sum((true == 1) & (pred == 1))
         tn += np.sum((true == 0) & (pred == 0))
@@ -226,6 +260,7 @@ def main(argv):
     neg_tot = tn+fp
     pos_pred = tp+fp
     neg_pred = tn+fn
+    print('TEST')
     print('Predicted: {} true, {} false; Truth: {} true, {} false'.format(pos_pred, neg_pred, pos_tot, neg_tot))
     print('Accuracy: {:.4f}'.format(acc))
     print('Fake Rate (1-Precision): {:.4f}'.format(1.-prec))
@@ -234,7 +269,8 @@ def main(argv):
     print('F1 Score {:.4f}'.format(f1))
 
     plt.ioff()
-    plt.plot(range(nepochs), loss_array, label="Training")
+    plt.plot(range(nepochs), train_loss_array, label="Training")
+    plt.plot(range(nepochs), val_loss_array, label="Validation")
     plt.legend()
     plt.xlabel("Epoch")
     plt.savefig("lossplot.png")

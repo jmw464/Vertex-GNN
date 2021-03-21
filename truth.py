@@ -4,7 +4,7 @@ import os,sys,math,ROOT,glob
 import numpy as np
 from ROOT import TFile, TH1D, gROOT, TCanvas, gPad
 
-maxentries = 1
+maxentries = 100
 
 class truth_particle():
     def __init__(self, barcode, pdgid, pv, dv, charged, p, parents, children):
@@ -99,7 +99,7 @@ def check_children(particle, particle_dict, particle_list): #particle_list store
     pdgid = particle.get_pdgid()
     condition = (id_particle(pdgid) == 'ch')
 
-    if condition and (barcode not in particle_list):
+    if condition:
         particle_list = np.append(particle_list, barcode)
         
     for child in particle.get_children():
@@ -128,6 +128,8 @@ def main(argv):
     hist_num_trk_c = TH1D("num_trk_c", "Number of tracks associated with c vertex", 10, 0, 10)
     hist_num_char_c = TH1D("num_char_c", "Number of charged particles associated with c vertex", 20, 0, 20)
     hist_num_c = TH1D("num_c", "Number of c hadrons per event", 10, 0, 10)
+
+    hist_btoc_dist = TH1D("btoc_dist", "distance between bH and cH production vertices", 20, 0, 50)
 
     total_legit = 0 ####
     total_trk = 0
@@ -245,8 +247,8 @@ def main(argv):
                 dv = particle.get_dv()
                 if dv[0] >= -990. and pv[0] >= -990.: #check that particle has decay and production vertex
 
-                    tracks = 0
-                    charged = 0
+                    tracks = 0 #number of spawned tracks
+                    charged = 0 #number of charged children
                     for c_barcode in particle.get_children():
                         child = particle_dict[c_barcode]
                         cpid = id_particle(child.get_pdgid())
@@ -255,7 +257,6 @@ def main(argv):
                         if child.is_charged():
                             charged += 1
                     
-                    #if tracks > 0:
                     hist_num_trk.Fill(tracks)
                     hist_fl_len.Fill(np.linalg.norm(pv-dv))
                     hist_num_char.Fill(charged)
@@ -272,18 +273,27 @@ def main(argv):
                     elif pid == 'bh':
                         total_bh += 1
                         event_bh += 1
-                        btoc_list = check_children(particle, particle_dict, btoc_list)
                         if tracks > 0:
                             total_bh_wtrk += 1
                         hist_fl_len_b.Fill(np.linalg.norm(pv-dv))
                         hist_num_trk_b.Fill(tracks)
                         hist_num_char_b.Fill(charged)
 
+                        #calculate/print information about b->c events (only line 2 required for plots)
+                        btoc_len = np.size(btoc_list)
+                        btoc_list = check_children(particle, particle_dict, btoc_list)
+                        btoc_new = btoc_list[btoc_len:]
+                        btoc_ids = btoc_dist = np.zeros(len(btoc_new))
+                        for i in range(len(btoc_new)):
+                            btoc_ids[i] = particle_dict[btoc_new[i]].get_pdgid()
+                            hist_btoc_dist.Fill(np.linalg.norm(pv-particle_dict[btoc_new[i]].get_pv()))
+                        print("bH: {} ({}); cH: {} ({})".format(barcode, pdgid, btoc_new, btoc_ids))
+                        
             #print full tree
             #if len(particle.get_parent()) == 0:
                 #print_tree(particle, particle_dict, track_dict, 1)
        
-        total_btoc += np.size(btoc_list)
+        total_btoc += np.size(np.unique(btoc_list))
         hist_num_hf.Fill(event_hf)
         hist_num_b.Fill(event_bh)
         hist_num_c.Fill(event_ch)
@@ -376,6 +386,13 @@ def main(argv):
     hist_num_b.GetYaxis().SetTitle("Entries")
     hist_num_b.Draw()
     canv1.SaveAs("num_b.png")
+
+    canv1 = TCanvas("c1","c1", 800, 600)
+    gPad.SetLogy()
+    hist_btoc_dist.GetXaxis().SetTitle("Distance [?]")
+    hist_btoc_dist.GetYaxis().SetTitle("Entries")
+    hist_btoc_dist.Draw()
+    canv1.SaveAs("btoc_dist.png")
 
 if __name__ == '__main__':
     main(sys.argv)
