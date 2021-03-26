@@ -4,7 +4,9 @@
 
 from GNN_model import *
 
-from torch_geometric.data import Data, DataLoader
+import dgl
+import torch as th
+import torch.nn as nn
 import os,sys,math,glob,ROOT
 import numpy as np
 import h5py
@@ -15,19 +17,22 @@ import time
 #th.set_printoptions(edgeitems=10000)
 np.set_printoptions(threshold=sys.maxsize)
 
-max_entries = 10
+max_entries = 1000000
 ngfeatures = 0 #number of features for graph
-nnfeatures = 13 #number of features per node
+nnfeatures = 10 #number of features per node
 nefeatures = 1 #number of features per edge
-nepochs = 5
+nepochs = 50
 
 trainp = .7
 valp = .2
 testp = .1
-learning_rate = 0.01
-pos_weight = th.tensor([25]) #reweight positive labels since negatives outnumber positives by 25:1
+learning_rate = 0.001
+pos_weight = th.tensor([2]) #reweight positive labels since negatives outnumber positives by 2:1
 reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
+batch_size = 500 #batch size is given in jets, not events
 
+gnn_outfeats = 256
+mlp_hidfeats = 512
 
 #create the edge list for a complete graph with n nodes
 def create_edge_list(n):
@@ -69,22 +74,11 @@ def create_mask(n, train_split, test_split):
     return train_mask, val_mask, test_mask
 
 
-def evaluate(model, graph, features, labels, mask):
-    model.eval()
-    with th.no_grad():
-        logits = model(graph, features)
-        logits = logits[mask]
-        labels = labels[mask]
-        _, indices = th.max(logits, dim=1)
-        correct = th.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
-
-
 def main(argv):
     gROOT.SetBatch(True)
     
     start_time = time.time()
-    infile = h5py.File("/global/homes/j/jmw464/ATLAS/cuts.hdf5", "r")
+    infile = h5py.File("/global/homes/j/jmw464/ATLAS/test.hdf5", "r")
     g_list = []
 
     ievent = -1
@@ -133,7 +127,7 @@ def main(argv):
             track_vx = infile['labels']['track_vx'][track_offset+j]
             track_vy = infile['labels']['track_vy'][track_offset+j]
             track_vz = infile['labels']['track_vz'][track_offset+j]
-            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi, track_vx, track_vy, track_vz]
+            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]#, track_vx, track_vy, track_vz]
             vertex_positions[j] = [track_vx, track_vy, track_vz]
         
         track_offset += ntracks
@@ -171,8 +165,9 @@ def main(argv):
 
         if ntracks > 1:
             #tr_mask, v_mask, te_mask = create_mask(nedges, trainp, testp)
-            e_index = th.from_numpy(np.array(create_edge_list(ntracks)))
-            g = Data(x=th.from_numpy(node_features), edge_index=e_index, edge_attr=th.from_numpy(edge_features), y=th.from_numpy(truth_labels))#, train_mask=th.from_numpy(tr_mask), val_mask=th.from_numpy(v_mask), test_mask=th.from_numpy(te_mask)) 
+            g = dgl.graph((create_edge_list(ntracks)))
+            g.ndata['features'] = th.from_numpy(node_features)
+            g.edata['labels'] = th.from_numpy(truth_labels)
             g_list.append(g)
 
     print("Time: {}s".format(time.time() - start_time))
@@ -183,7 +178,7 @@ def main(argv):
     test_list = g_list[int(len(g_list)*(trainp+valp)-1):]
 
     device = th.device('cuda' if th.cuda.is_available() else 'cpu')
-    model = EdgePredModel(nnfeatures, 500, 100).to(device)
+    model = EdgePredModel(nnfeatures, gnn_outfeats, mlp_hidfeats).to(device)
     
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(device)
@@ -193,9 +188,15 @@ def main(argv):
 
     print("Running on {}".format(device))
 
-    train_loader = DataLoader(train_list, batch_size=500, shuffle=True)
-    val_loader = DataLoader(val_list, batch_size = 100, shuffle=False)
-    test_loader = DataLoader(test_list, batch_size=1, shuffle=False)
+    train_batch = []
+    index = 0
+    for i in range(math.floor(len(train_list)/batch_size)):
+        train_batch.append(dgl.batch(train_list[batch_size*i:batch_size*(i+1)]))
+        index = i
+    train_batch.append(dgl.batch(train_list[batch_size*index:]))
+
+    val_batch = dgl.batch(val_list)
+    test_batch = dgl.batch(test_list)
 
     for name, param in model.named_parameters():
         print(name, param.data, param.requires_grad)
@@ -205,51 +206,57 @@ def main(argv):
     for epoch in range(1,nepochs+1):
         print("Epoch: {}".format(epoch))
         
-        #training loop
+        #training
         model.train()
-        for batch in train_loader:
+        for batch in train_batch:
             batch = batch.to(device) #transfer batch to relevant device
+            node_features = batch.ndata['features']
+            edge_labels = batch.edata['labels']
+    
+            pred = model(batch, node_features)
+            pred_l = loss(pred, edge_labels)
             opt.zero_grad()
-            pred = model(batch.x, batch.edge_index, device)
-            l_pred = loss(pred.float(),batch.y.float())
-            opt.zero_grad()
-            l_pred.backward()
+            pred_l.backward()
             opt.step()
-            print(l_pred.item())
-            train_loss_array[epoch-1] += l_pred.item()/len(train_loader)
+            print(pred_l.item())
+            train_loss_array[epoch-1] += pred_l.item()/len(train_batch)
 
-        #validation loop
+        #validation
         model.eval()
         tp = tn = fp = fn = 0
-        for batch in val_loader:
-            batch = batch.to(device)
-            pred = model(batch.x, batch.edge_index, device)
-            l_pred = loss(pred.float(),batch.y.float())
-            pred = sig(pred.float()).cpu().detach().numpy().flatten().round().astype(int)
-            true = batch.y.cpu().numpy().flatten().astype(int)
-            tp += np.sum((true == 1) & (pred == 1))
-            tn += np.sum((true == 0) & (pred == 0))
-            fp += np.sum((true == 0) & (pred == 1))
-            fn += np.sum((true == 1) & (pred == 0))
-            val_loss_array[epoch-1] += l_pred.item()/len(val_loader)
+        val_batch = val_batch.to(device)
+        node_features = val_batch.ndata['features']
+        edge_labels = val_batch.edata['labels']
         
-        print('Predicted: {} true, {} false; Truth: {} true, {} false'.format(tp+fp, tn+fn, tp+fn, tn+fp))
-        print('Accuracy: {:.4f}'.format((tp+tn)/(tp+tn+fp+fn)))
-        print('Fake Rate (1-Precision): {:.4f}'.format(1.-tp/(tp+fp)))
-        print("Time: {}s".format(time.time() - start_time))
-        print("")
+        pred = model(val_batch, node_features)
+        pred_l = loss(pred, edge_labels)
+        print("Validation loss: {}".format(pred_l.item()))
+        val_loss_array[epoch-1] = pred_l.item()
 
-    #testing loop
-    tp = tn = fp = fn = 0
-    model.eval()
-    for batch in test_loader:
-        batch = batch.to(device)
-        pred = sig(model(batch.x, batch.edge_index, device).float()).cpu().detach().numpy().flatten().round().astype(int)
-        true = batch.y.cpu().numpy().flatten().astype(int)
+        pred = sig(pred.float()).cpu().detach().numpy().flatten().round().astype(int)
+        true = edge_labels.cpu().numpy().flatten().astype(int)
         tp += np.sum((true == 1) & (pred == 1))
         tn += np.sum((true == 0) & (pred == 0))
         fp += np.sum((true == 0) & (pred == 1))
         fn += np.sum((true == 1) & (pred == 0))
+        
+        print('Validation results: {} TP, {} FP, {} TN, {} FN'.format(tp, fp, tn, fn))
+        print("Time: {}s".format(time.time() - start_time))
+        print("")
+
+    #testing
+    tp = tn = fp = fn = 0
+    model.eval()
+    test_batch = test_batch.to(device)
+    node_features = test_batch.ndata['features']
+    edge_labels = test_batch.edata['labels']
+    
+    pred = sig(model(test_batch, node_features).float()).cpu().detach().numpy().flatten().round().astype(int)
+    true = edge_labels.cpu().numpy().flatten().astype(int)
+    tp += np.sum((true == 1) & (pred == 1))
+    tn += np.sum((true == 0) & (pred == 0))
+    fp += np.sum((true == 0) & (pred == 1))
+    fn += np.sum((true == 1) & (pred == 0))
 
     acc = (tp+tn)/(tp+tn+fp+fn)
     tpr = tp/(tp+fn)

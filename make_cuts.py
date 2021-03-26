@@ -6,7 +6,8 @@ import h5py
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas, TTree
 np.set_printoptions(threshold=sys.maxsize)
 
-max_entries = 10000
+max_entries = 95000
+remove_pv = True
 
 def check_event(entry):
     return True
@@ -14,10 +15,11 @@ def check_event(entry):
 def main(argv):
     gROOT.SetBatch(True)
     
+    #ntuple = TFile("/global/homes/j/jmw464/ATLAS/FlavourTagPerformanceFramework/run/flav_Akt4EMPf_BTagging201903.root")
     ntuple = TFile('/global/homes/t/toyamaza/workdir/ctag/data/ntuples/v10/output_WpHbb_0.root')
     tree = ntuple.Get("bTag_AntiKt4EMPFlowJets_BTagging201903")
     
-    outfile = h5py.File("/global/homes/j/jmw464/ATLAS/cuts.hdf5", "w")
+    outfile = h5py.File("/global/homes/j/jmw464/ATLAS/test.hdf5", "w")
     
     #tot_events = 0
     #tot_jets = 0
@@ -58,6 +60,8 @@ def main(argv):
     labels['track_vy'] = []
     labels['track_vz'] = []
 
+    total_cut = 0
+    total_tracks = 0
     total_events = 0
     post_cut_events = 0
     for ientry,entry in enumerate(tree):
@@ -77,33 +81,40 @@ def main(argv):
                 jfeatures['eta'].append(entry.jet_eta[i])
                 jfeatures['phi'].append(entry.jet_phi[i])
 
-                track_vx = np.zeros(ntracks)
-                track_vy = np.zeros(ntracks)
-                track_vz = np.zeros(ntracks)
-
                 #read in features
+                cut_tracks = 0
                 for j in range(ntracks):
-                    tfeatures['pt'].append(entry.jet_trk_pt[i][j])
-                    tfeatures['eta'].append(entry.jet_trk_eta[i][j])
-                    tfeatures['theta'].append(entry.jet_trk_theta[i][j])
-                    tfeatures['phi'].append(entry.jet_trk_phi[i][j])
-                    tfeatures['d0'].append(entry.jet_trk_d0[i][j])
-                    tfeatures['z0'].append(entry.jet_trk_z0[i][j])
-                    tfeatures['q'].append(entry.jet_trk_charge[i][j])
-
-                    labels['track_vx'].append(entry.jet_trk_vtx_X[i][j])
-                    labels['track_vy'].append(entry.jet_trk_vtx_Y[i][j])
-                    labels['track_vz'].append(entry.jet_trk_vtx_Z[i][j])
-       
+                    pv_dist = math.sqrt((entry.truth_PVx-entry.jet_trk_vtx_X[i][j])**2 + (entry.truth_PVy-entry.jet_trk_vtx_Y[i][j])**2 + (entry.truth_PVz-entry.jet_trk_vtx_Z[i][j])**2)
+                    pv_criterion = (pv_dist < 1e-4 or entry.jet_trk_vtx_X[i][j] < -990)#(entry.jet_trk_isPV[i][j])
+                    if remove_pv and pv_criterion:
+                        cut_tracks += 1
+                    else:
+                        tfeatures['pt'].append(entry.jet_trk_pt[i][j])
+                        tfeatures['eta'].append(entry.jet_trk_eta[i][j])
+                        tfeatures['theta'].append(entry.jet_trk_theta[i][j])
+                        tfeatures['phi'].append(entry.jet_trk_phi[i][j])
+                        tfeatures['d0'].append(entry.jet_trk_d0[i][j])
+                        tfeatures['z0'].append(entry.jet_trk_z0[i][j])
+                        tfeatures['q'].append(entry.jet_trk_charge[i][j])
+                        
+                        labels['track_vx'].append(entry.jet_trk_vtx_X[i][j])
+                        labels['track_vy'].append(entry.jet_trk_vtx_Y[i][j])
+                        labels['track_vz'].append(entry.jet_trk_vtx_Z[i][j])
+                
                 info['event'].append(ientry)
                 info['jet'].append(i)
-                info['ntracks'].append(ntracks)
+                info['ntracks'].append(ntracks-cut_tracks)
                 
+                total_tracks += ntracks
+                total_cut += cut_tracks
+
             post_cut_events += 1
 
         total_events += 1
         if post_cut_events >= max_entries:
             break
+
+    print("Cut {}% of {} tracks".format(total_cut*100./total_tracks, total_tracks))
 
     grp_info = outfile.create_group("info")
     grp_tfeatures = outfile.create_group("tfeatures")

@@ -58,6 +58,9 @@ class truth_track():
     def get_barcode(self):
         return self.barcode
 
+    def get_vertex(self):
+        return self.vertex
+
     def print_track(self,level):
         prefix = "xx"*level + ">"
         print("{} PDG ID: {}, Barcode: {}, Vertex: {}".format(prefix, self.pdgid, self.barcode, self.vertex))
@@ -66,7 +69,7 @@ class truth_track():
 def print_tree(particle, particle_dict, track_dict, level):
     barcode = particle.get_barcode()
     pdgid = particle.get_pdgid()
-    condition = True #(id_particle(pdgid) == 'ch') or (id_particle(pdgid) == 'bh')
+    condition = pdgid != 21 and pdgid != 22 #(id_particle(pdgid) == 'ch') or (id_particle(pdgid) == 'bh')
 
     #print information
     if condition:
@@ -156,7 +159,7 @@ def main(argv):
             jet_phi = entry.jet_phi[i]
             jet_m   = entry.jet_m[i]
             jet_label = entry.jet_LabDr_HadF[i]
-            
+           
             nTrack =  entry.jet_trk_pt[i].size()
             for j in range ( nTrack ):
                 trk_pt = entry.jet_trk_pt[i][j]
@@ -200,7 +203,7 @@ def main(argv):
             truth_nParent = entry.truth_parent_pdgId[i].size()
             truth_nChild = entry.truth_child_pdgId[i].size()
            
-            output = "barcode =%8d, pdgId =%9d, status =%3d, nParent= %d, nChild=%d : "%(truth_barcode,truth_pdgId, truth_status,truth_nParent,truth_nChild)
+            output = "barcode =%8d, pdgId =%9d, status =%3d, nParent= %d, nChild=%d : "%(truth_barcode, truth_pdgId, truth_status, truth_nParent, truth_nChild)
 
             child_pdgId_array = np.zeros(truth_nChild)
             child_barcode_array = np.zeros(truth_nChild)
@@ -249,14 +252,18 @@ def main(argv):
 
                     tracks = 0 #number of spawned tracks
                     charged = 0 #number of charged children
+                    for t_barcode in track_dict:
+                        tv = track_dict[t_barcode].get_vertex()
+                        if np.linalg.norm(tv-dv) < 1e-4:
+                            tracks += 1
                     for c_barcode in particle.get_children():
                         child = particle_dict[c_barcode]
                         cpid = id_particle(child.get_pdgid())
-                        if c_barcode in track_dict:
-                            tracks += 1
                         if child.is_charged():
                             charged += 1
-                    
+                   
+                    print(tracks)
+
                     hist_num_trk.Fill(tracks)
                     hist_fl_len.Fill(np.linalg.norm(pv-dv))
                     hist_num_char.Fill(charged)
@@ -290,8 +297,8 @@ def main(argv):
                         print("bH: {} ({}); cH: {} ({})".format(barcode, pdgid, btoc_new, btoc_ids))
                         
             #print full tree
-            #if len(particle.get_parent()) == 0:
-                #print_tree(particle, particle_dict, track_dict, 1)
+            #if len(particle.get_parents()) == 0:
+            #    print_tree(particle, particle_dict, track_dict, 1)
        
         total_btoc += np.size(np.unique(btoc_list))
         hist_num_hf.Fill(event_hf)
