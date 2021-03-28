@@ -9,8 +9,10 @@ np.set_printoptions(threshold=sys.maxsize)
 max_entries = 95000
 remove_pv = True
 
+#implement cuts for a given event
 def check_event(entry):
     return True
+
 
 def main(argv):
     gROOT.SetBatch(True)
@@ -81,7 +83,7 @@ def main(argv):
                 jfeatures['eta'].append(entry.jet_eta[i])
                 jfeatures['phi'].append(entry.jet_phi[i])
 
-                #read in features
+                #read in track features
                 cut_tracks = 0
                 for j in range(ntracks):
                     pv_dist = math.sqrt((entry.truth_PVx-entry.jet_trk_vtx_X[i][j])**2 + (entry.truth_PVy-entry.jet_trk_vtx_Y[i][j])**2 + (entry.truth_PVz-entry.jet_trk_vtx_Z[i][j])**2)

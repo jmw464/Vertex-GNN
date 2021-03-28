@@ -15,24 +15,31 @@ import matplotlib.pyplot as plt
 import time
 
 #th.set_printoptions(edgeitems=10000)
-np.set_printoptions(threshold=sys.maxsize)
+#np.set_printoptions(threshold=sys.maxsize)
 
+#input data parameters
+infile_name = "/global/homes/j/jmw464/ATLAS/test.hdf5"
 max_entries = 1000000
-ngfeatures = 0 #number of features for graph
 nnfeatures = 10 #number of features per node
-nefeatures = 1 #number of features per edge
+nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
+
+#training parameters
 nepochs = 50
-
-trainp = .7
-valp = .2
-testp = .1
+valp = .2 #fraction of data reserved for validation
+testp = .1 #fraction of data reserved for testing
 learning_rate = 0.001
-pos_weight = th.tensor([2]) #reweight positive labels since negatives outnumber positives by 2:1
-reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
-batch_size = 500 #batch size is given in jets, not events
+batch_size = 500 #number of jets in a single training batch
 
-gnn_outfeats = 256
-mlp_hidfeats = 512
+#model parameters
+attention_heads = 2 #number of attention heads in GAT layer -> these are averaged over
+gnn_hidfeats = 256 #number of hidden features in GAT layer output
+mlp_hidfeats = 512 #number of hidden features in MLP layers (actual number is twice this since two node feature sets are concatenated)
+
+#script options
+reweight = True #reweight positive labels in loss to make positives and negatives equally important
+reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
+load_checkpoint = False
+checkpoint_path = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/model.pt"
 
 #create the edge list for a complete graph with n nodes
 def create_edge_list(n):
@@ -51,34 +58,25 @@ def create_edge_list(n):
     return senders, receivers
 
 
-#NO LONGER USED
-def create_mask(n, train_split, test_split):
-    train_mask = np.zeros(n, dtype=np.bool)
-    val_mask = np.zeros(n, dtype=np.bool)
-    test_mask = np.zeros(n, dtype=np.bool)
+#evaluate tp, tn, fp, fn for GNN results
+def evaluate_results(true, pred):
+
+    tp = np.sum((true == 1) & (pred == 1))
+    tn = np.sum((true == 0) & (pred == 0))
+    fp = np.sum((true == 0) & (pred == 1))
+    fn = np.sum((true == 1) & (pred == 0))
     
-    train_mask[:round(n*train_split)] = 1
-    np.random.shuffle(train_mask)
-    taken_indices = np.array(np.where(train_mask > 0))[0]
-    indices = np.array(np.where(1-train_mask > 0))[0]
-    np.random.shuffle(indices)
-    indices_test = (indices[:round(n*test_split)])
-    indices_val = (indices[round(n*test_split):])
-
-    for i in range(n):
-        if i in indices_test:
-            test_mask[i] = 1
-        elif i in indices_val:
-            val_mask[i] = 1
-
-    return train_mask, val_mask, test_mask
+    return tp, tn, fp, fn
 
 
 def main(argv):
     gROOT.SetBatch(True)
     
+    print("")
+    print("Processing input data.")
+
     start_time = time.time()
-    infile = h5py.File("/global/homes/j/jmw464/ATLAS/test.hdf5", "r")
+    infile = h5py.File(infile_name, "r")
     g_list = []
 
     ievent = -1
@@ -163,118 +161,121 @@ def main(argv):
         total_ones += np.sum(truth_labels)
         total_edges += np.size(truth_labels)
 
+        #create graph objects and append them to the list
         if ntracks > 1:
-            #tr_mask, v_mask, te_mask = create_mask(nedges, trainp, testp)
             g = dgl.graph((create_edge_list(ntracks)))
             g.ndata['features'] = th.from_numpy(node_features)
             g.edata['labels'] = th.from_numpy(truth_labels)
             g_list.append(g)
 
-    print("Time: {}s".format(time.time() - start_time))
-    print("TRUTH {}".format(total_ones/total_edges))
+    infile.close()
+    p_time = time.time()-start_time
+    print("Finished processing input data. Time elapsed: {}s.\n".format(p_time))
 
-    train_list = g_list[:int(len(g_list)*trainp-1)]
-    val_list = g_list[int(len(g_list)*trainp-1):int(len(g_list)*(trainp+valp)-1)]
-    test_list = g_list[int(len(g_list)*(trainp+valp)-1):]
+    #reweight positive labels automatically if desired
+    if reweight:
+        truth_frac = total_ones/total_edges
+        pos_weight = th.tensor([(1-truth_frac)/truth_frac])
+    else:
+        pos_weight = th.tensor([1])
 
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu')
-    model = EdgePredModel(nnfeatures, gnn_outfeats, mlp_hidfeats).to(device)
+    #split data into testing, training and validation set
+    test_list = g_list[:int(len(g_list)*testp-1)]
+    val_list = g_list[int(len(g_list)*testp-1):int(len(g_list)*(testp+valp)-1)]
+    train_list = g_list[int(len(g_list)*(testp+valp)-1):]
+
+    device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
     
+    model = EdgePredModel(nnfeatures, gnn_hidfeats, mlp_hidfeats, attention_heads).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(device)
+    sig = nn.Sigmoid() #since loss already has sigmoid function built in, we need to pass model outputs through a separate sigmoid function for evaluation
+
     train_loss_array = np.zeros(nepochs)
     val_loss_array = np.zeros(nepochs)
-    sig = nn.Sigmoid()
 
-    print("Running on {}".format(device))
-
+    #split testing data into batches
     train_batch = []
-    index = 0
+    b_index = 0
     for i in range(math.floor(len(train_list)/batch_size)):
         train_batch.append(dgl.batch(train_list[batch_size*i:batch_size*(i+1)]))
-        index = i
-    train_batch.append(dgl.batch(train_list[batch_size*index:]))
+        b_index = i
+    train_batch.append(dgl.batch(train_list[batch_size*b_index:]))
 
     val_batch = dgl.batch(val_list)
     test_batch = dgl.batch(test_list)
-
+    
+    #print model parameters
+    print("Model built. Parameters:")
     for name, param in model.named_parameters():
-        print(name, param.data, param.requires_grad)
+        print(name, param.size(), param.requires_grad)
     print("")
 
-    model = model.double()
-    for epoch in range(1,nepochs+1):
+    #load existing checkpoint
+    if load_checkpoint and os.path.exists(checkpoint_path):
+        checkpoint = th.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        opt.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch']+1
+        print("Loading previous model. Starting from epoch {}.".format(start_epoch))
+    else:
+        start_epoch = 1
+
+    #main training loop
+    t_time = time.time()-start_time
+    print("Beginning training. Running on {}. Time elapsed: {}s.\n".format(device, t_time))
+    for epoch in range(start_epoch,nepochs+1):
         print("Epoch: {}".format(epoch))
         
         #training
         model.train()
         for batch in train_batch:
             batch = batch.to(device) #transfer batch to relevant device
-            node_features = batch.ndata['features']
-            edge_labels = batch.edata['labels']
-    
-            pred = model(batch, node_features)
-            pred_l = loss(pred, edge_labels)
+            pred = model(batch, batch.ndata['features'])
+            pred_l = loss(pred, batch.edata['labels'])
             opt.zero_grad()
             pred_l.backward()
             opt.step()
-            print(pred_l.item())
+            print("Training loss: {}".format(pred_l.item()))
             train_loss_array[epoch-1] += pred_l.item()/len(train_batch)
+
+        #save checkpoint
+        th.save({'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': opt.state_dict()}, checkpoint_path)
 
         #validation
         model.eval()
-        tp = tn = fp = fn = 0
         val_batch = val_batch.to(device)
-        node_features = val_batch.ndata['features']
-        edge_labels = val_batch.edata['labels']
-        
-        pred = model(val_batch, node_features)
-        pred_l = loss(pred, edge_labels)
+        pred = model(val_batch, val_batch.ndata['features'])
+        pred_l = loss(pred, val_batch.edata['labels'])
         print("Validation loss: {}".format(pred_l.item()))
         val_loss_array[epoch-1] = pred_l.item()
 
         pred = sig(pred.float()).cpu().detach().numpy().flatten().round().astype(int)
-        true = edge_labels.cpu().numpy().flatten().astype(int)
-        tp += np.sum((true == 1) & (pred == 1))
-        tn += np.sum((true == 0) & (pred == 0))
-        fp += np.sum((true == 0) & (pred == 1))
-        fn += np.sum((true == 1) & (pred == 0))
+        true = val_batch.edata['labels'].cpu().numpy().flatten().astype(int)
+        tp, tn, fp, fn = evaluate_results(true, pred)
         
-        print('Validation results: {} TP, {} FP, {} TN, {} FN'.format(tp, fp, tn, fn))
-        print("Time: {}s".format(time.time() - start_time))
-        print("")
+        e_time = time.time()-start_time
+        print('Validation results: {} TP, {} FP, {} TN, {} FN. Time elapsed: {}s.\n'.format(tp, fp, tn, fn, e_time))
+
+    print("Training finished. Evaluating model.\n")
 
     #testing
-    tp = tn = fp = fn = 0
     model.eval()
     test_batch = test_batch.to(device)
     node_features = test_batch.ndata['features']
     edge_labels = test_batch.edata['labels']
     
-    pred = sig(model(test_batch, node_features).float()).cpu().detach().numpy().flatten().round().astype(int)
-    true = edge_labels.cpu().numpy().flatten().astype(int)
-    tp += np.sum((true == 1) & (pred == 1))
-    tn += np.sum((true == 0) & (pred == 0))
-    fp += np.sum((true == 0) & (pred == 1))
-    fn += np.sum((true == 1) & (pred == 0))
+    pred = sig(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy().flatten().round().astype(int)
+    true = test_batch.edata['labels'].cpu().numpy().flatten().astype(int)
+    tp, tn, fp, fn = evaluate_results(true, pred)
+    print("Test results: {} TP, {} FP, {} TN, {} FN.".format(tp, fp, tn, fn))
+    print('Accuracy: {:.4f}'.format((tp+tn)/(tp+tn+fp+fn)))
+    print('Fake Rate (1-Precision): {:.4f}'.format(1.-tp/(tp+fp)))
+    print('Efficiency (TPR): {:.4f}'.format(tp/(tp+fn)))
+    print('True Negative Rate: {:.4f}'.format(tn/(tn+fp)))
+    print('F1 Score {:.4f}'.format(2*tp/(2*tp+fp+fn)))
 
-    acc = (tp+tn)/(tp+tn+fp+fn)
-    tpr = tp/(tp+fn)
-    tnr = tn/(tn+fp)
-    prec = tp/(tp+fp)
-    f1 = 2*tp/(2*tp+fp+fn)
-    pos_tot = tp+fn
-    neg_tot = tn+fp
-    pos_pred = tp+fp
-    neg_pred = tn+fn
-    print('TEST')
-    print('Predicted: {} true, {} false; Truth: {} true, {} false'.format(pos_pred, neg_pred, pos_tot, neg_tot))
-    print('Accuracy: {:.4f}'.format(acc))
-    print('Fake Rate (1-Precision): {:.4f}'.format(1.-prec))
-    print('Efficiency (TPR): {:.4f}'.format(tpr))
-    print('True Negative Rate: {:.4f}'.format(tnr))
-    print('F1 Score {:.4f}'.format(f1))
-
+    #plot loss
     plt.ioff()
     plt.plot(range(nepochs), train_loss_array, label="Training")
     plt.plot(range(nepochs), val_loss_array, label="Validation")

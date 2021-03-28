@@ -7,9 +7,9 @@ import dgl.function as fn
 
 
 class GCN(nn.Module):
-    def __init__(self, in_features, hidden_features, out_features):
+    def __init__(self, in_features, out_features, attn_heads):
         super(GCN, self).__init__()
-        self.conv1 = dglnn.GATConv(in_features, out_features, 2)
+        self.conv1 = dglnn.GATConv(in_features, out_features, attn_heads)
 
     def forward(self, g, x):
         # inputs are features of nodes
@@ -22,7 +22,7 @@ class GCN(nn.Module):
 class MLPPredictor(nn.Module):
     def __init__(self, in_features, hidden_features, out_features):
         super().__init__()
-        self.lin1 = nn.Linear(in_features*2, hidden_features)
+        self.lin1 = nn.Linear(in_features, hidden_features)
         self.lin2 = nn.Linear(hidden_features, out_features)
     def apply_edges(self, edges):
         h_u = edges.src['h']
@@ -46,10 +46,10 @@ class DotProductPredictor(nn.Module):
 
 
 class EdgePredModel(nn.Module):
-    def __init__(self, in_features, hidden_features, out_features):
+    def __init__(self, in_features, gnn_hidden_features, mlp_hidden_features, attn_heads):
         super().__init__()
-        self.gcn = GCN(in_features, hidden_features, out_features)
-        self.pred = MLPPredictor(out_features, out_features, 1)
+        self.gcn = GCN(in_features, gnn_hidden_features, attn_heads)
+        self.pred = MLPPredictor(gnn_hidden_features*2, mlp_hidden_features*2, 1)
     def forward(self, g, x):
         h = self.gcn(g, x)
         h = self.pred(g, h)
