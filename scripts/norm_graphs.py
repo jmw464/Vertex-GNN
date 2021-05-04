@@ -2,24 +2,27 @@ import dgl
 import torch as th
 import os,sys,math,glob,ROOT
 import numpy as np
-
-#############################################SCRIPT PARAMS#################################################
-
-#input data parameters
-file_path = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/"
-file_name = "Btag_07_19_cut"
-
-###########################################################################################################
-
-train_infile_name = file_path+file_name+"_train.bin"
-val_infile_name = file_path+file_name+"_val.bin"
-test_infile_name = file_path+file_name+"_test.bin"
-train_outfile_name = file_path+file_name+"_train.normed.bin"
-val_outfile_name = file_path+file_name+"_val.normed.bin"
-test_outfile_name = file_path+file_name+"_test.normed.bin"
+import argparse
 
 
 def main(argv):
+
+    #parse command line arguments
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
+    parser.add_argument("-s", "--dataset", type=str, required=True, dest="data_name", help="name of dataset to create (without hdf5 extension)")
+    args = parser.parse_args()
+
+    data_path = args.data_dir
+    data_name = args.data_name
+
+    train_infile_name = data_path+data_name+"_train.bin"
+    val_infile_name = data_path+data_name+"_val.bin"
+    test_infile_name = data_path+data_name+"_test.bin"
+    train_outfile_name = data_path+data_name+"_train.normed.bin"
+    val_outfile_name = data_path+data_name+"_val.normed.bin"
+    test_outfile_name = data_path+data_name+"_test.normed.bin"
+
     train_graphs = dgl.load_graphs(train_infile_name)[0]
     num_features = train_graphs[0].ndata['features'].size()[1]
     mean_features = np.zeros(num_features)
@@ -52,23 +55,23 @@ def main(argv):
     std_features[9] = math.pi
 
     #apply normalization from training data to all graph features
-    print("Normalizing training data")
+    print("Normalizing {} training graphs".format(len(train_graphs)))
     for graph in train_graphs:
         features = graph.ndata['features'].numpy()
         normed_features = np.divide(features-mean_features, std_features)
         graph.ndata['features'] = th.from_numpy(normed_features)
     dgl.save_graphs(train_outfile_name, train_graphs)
 
-    print("Normalizing validation data")
     val_graphs = dgl.load_graphs(val_infile_name)[0]
+    print("Normalizing {} validation graphs".format(len(val_graphs)))
     for graph in val_graphs:
         features = graph.ndata['features'].numpy()
         normed_features = np.divide(features-mean_features, std_features)
         graph.ndata['features'] = th.from_numpy(normed_features)
     dgl.save_graphs(val_outfile_name, val_graphs)
 
-    print("Normalizing testing data")
     test_graphs = dgl.load_graphs(test_infile_name)[0]
+    print("Normalizing {} testing graphs".format(len(test_graphs)))
     for graph in test_graphs:
         features = graph.ndata['features'].numpy()
         normed_features = np.divide(features-mean_features, std_features)

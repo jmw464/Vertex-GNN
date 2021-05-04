@@ -6,6 +6,7 @@ import torch.nn as nn
 import os,sys,math,glob,ROOT
 import numpy as np
 import h5py
+import argparse
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
 import matplotlib.pyplot as plt
 import time
@@ -13,14 +14,10 @@ import time
 #############################################SCRIPT PARAMS#################################################
 
 #input data parameters
-infile_name = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/Btag_07_19_cut.hdf5"
 nnfeatures = 10 #number of features per node
 nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 
 #output data parameters
-outfile_path = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/"
-outfile_name = "Btag_07_19_cut"
-max_entries = 100000
 valp = 0.2 #fraction of data used for validation
 testp = 0.1 #fraction of data used for testing
 
@@ -28,12 +25,6 @@ testp = 0.1 #fraction of data used for testing
 reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
 
 ###########################################################################################################
-
-#file names
-paramfile_name = outfile_path+outfile_name+"_params"
-train_outfile_name = outfile_path+outfile_name+"_train.bin"
-val_outfile_name = outfile_path+outfile_name+"_val.bin"
-test_outfile_name = outfile_path+outfile_name+"_test.bin"
 
 
 #create the edge list for a complete graph with n nodes
@@ -55,44 +46,51 @@ def create_edge_list(n):
 
 def main(argv):
     gROOT.SetBatch(True)
-    
-    print("Processing input data.")
+
+    #parse command line arguments
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
+    parser.add_argument("-s", "--dataset", type=str, required=True, dest="data_name", help="name of dataset to create (without hdf5 extension)")
+    args = parser.parse_args()
+
+    data_path = args.data_dir
+    data_name = args.data_name
+
+    #file names
+    infile_name = data_path+data_name+".hdf5"
+    paramfile_name = data_path+data_name+"_params"
+    train_outfile_name = data_path+data_name+"_train.bin"
+    val_outfile_name = data_path+data_name+"_val.bin"
+    test_outfile_name = data_path+data_name+"_test.bin"
 
     start_time = time.time()
     infile = h5py.File(infile_name, "r")
     g_list = []
 
-    ievent = -1
     total_jets = len(infile['info']['event'])
-    current_event = -1
     track_offset = 0 #tracks are stored in continuous chunk -> need to offset indices for each jet
     total_ones = 0
     total_edges = 0
     ngraphs = 0
+    event_index = previous_event = -1
     for ientry in range(total_jets):
         
-        #read in current event number and update number of processed events - events are not necessarily sequential
-        if current_event != infile['info']['event'][ientry]:
-            current_event = infile['info']['event'][ientry]
-            ievent += 1
-            
-            if ievent >= max_entries:
-                break
-            
-            print("Processing event {}".format(ievent))
-       
         #read in event/jet information
+        current_event = infile['info']['event'][ientry]
+        if current_event != previous_event:
+            event_index += 1
+            previous_event = current_event
         current_jet = infile['info']['jet'][ientry]
         ntracks =  infile['info']['ntracks'][ientry]
-        primary_vertex = np.array([infile['efeatures']['event_vx'][current_event], infile['efeatures']['event_vy'][current_event], infile['efeatures']['event_vz'][current_event]])
+        primary_vertex = np.array([infile['efeatures']['event_vx'][event_index], infile['efeatures']['event_vy'][event_index], infile['efeatures']['event_vz'][event_index]])
         nedges = ntracks*(ntracks-1)
 
         #initialize empty arrays
         node_features = np.zeros((ntracks,nnfeatures))
+        node_info = np.zeros((ntracks, 2)) #store event info
         edge_features = np.zeros((nedges,nefeatures))
         vertex_positions = np.zeros((ntracks,3))
         truth_labels = np.zeros((nedges,1))
-        print("event %d, jet %d with %d tracks"%(ievent, current_jet, ntracks))
         
         #read in features
         for j in range(ntracks):
@@ -111,7 +109,8 @@ def main(argv):
             track_vx = infile['labels']['track_vx'][track_offset+j]
             track_vy = infile['labels']['track_vy'][track_offset+j]
             track_vz = infile['labels']['track_vz'][track_offset+j]
-            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]#, track_vx, track_vy, track_vz]
+            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
+            node_info[j] = [current_event, current_jet]
             vertex_positions[j] = [track_vx, track_vy, track_vz]
         
         track_offset += ntracks
@@ -151,9 +150,14 @@ def main(argv):
         if ntracks > 1:
             g = dgl.graph((create_edge_list(ntracks)))
             g.ndata['features'] = th.from_numpy(node_features)
+            g.ndata['info'] = th.from_numpy(node_info)
             g.edata['labels'] = th.from_numpy(truth_labels)
             g_list.append(g)
             ngraphs += 1
+
+        #output progress
+        sys.stdout.write("\rProcessed {}% of jets".format(round(ngraphs*100/total_jets)))
+        sys.stdout.flush()
 
     #calculate size of testing, training and validation set
     test_len = int(round(testp*ngraphs))
@@ -181,7 +185,7 @@ def main(argv):
     paramfile.close()
 
     p_time = time.time()-start_time
-    print("Finished processing input data. Time elapsed: {}s.".format(p_time))
+    print("\nFinished creating graphs. Time elapsed: {}s.".format(p_time))
 
 
 if __name__ == '__main__':

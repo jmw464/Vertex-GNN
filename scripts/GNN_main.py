@@ -12,22 +12,18 @@ import torch as th
 import torch.nn as nn
 import os,sys,math,glob,time
 import numpy as np
+import argparse
 import ROOT
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
 import matplotlib.pyplot as plt
 
 #th.set_printoptions(edgeitems=10000)
-#np.set_printoptions(threshold=sys.maxsize)
+np.set_printoptions(threshold=sys.maxsize)
+
 
 #############################################SCRIPT PARAMS#################################################
 
-#input data parameters
-infile_path = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/"
-infile_name = "Btag_07_19_cut"
-
 #training parameters
-nepochs = 30
-learning_rate = 0.001
 batch_size = 10000 #number of jets in a single training batch
 
 #model parameters
@@ -37,40 +33,90 @@ mlp_hidfeats = 512 #number of hidden features in MLP layers (actual number is tw
 
 #script options
 reweight = True #reweight positive labels in loss to make positives and negatives equally important
-use_normed = True #use normed version of graphs (if available)
 load_checkpoint = False
-checkpoint_path = "/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/model.pt"
 
 ###########################################################################################################
-
-#open relevant files
-if use_normed:
-    ext = ".normed"
-else:
-    ext = ""
-paramfile_name = infile_path+infile_name+"_params"
-train_infile_name = infile_path+infile_name+"_train"+ext+".bin"
-val_infile_name = infile_path+infile_name+"_val"+ext+".bin"
-test_infile_name = infile_path+infile_name+"_test"+ext+".bin"
 
 
 #evaluate tp, tn, fp, fn for GNN results
 def evaluate_results(true, pred):
 
-    tp = np.sum((true == 1) & (pred == 1))
-    tn = np.sum((true == 0) & (pred == 0))
-    fp = np.sum((true == 0) & (pred == 1))
-    fn = np.sum((true == 1) & (pred == 0))
+    tp = np.sum((true == 1) & (pred == 1)) #actually true, marked as true
+    tn = np.sum((true == 0) & (pred == 0)) #actually false, marked as false
+    fp = np.sum((true == 0) & (pred == 1)) #actually false, marked as true
+    fn = np.sum((true == 1) & (pred == 0)) #actually true, marked as false
     
     return tp, tn, fp, fn
 
 
+#print list of jets GNN performs poorly on
+def print_bad_events(pred, true, node_info, outfile):
+    event_list = node_info[:,0]
+    jet_list = node_info[:,1]
+
+    eindex_begin = eindex_end = ntracks = 0
+    current_event = event_list[0]
+    current_jet = jet_list[0]
+    total_bad = total = 0
+    for i in range(len(event_list)+1):
+        if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i]:
+            eindex_begin = eindex_end
+            eindex_end += ntracks*(ntracks-1)
+            ntracks = 1
+            rel_pred = pred[eindex_begin:eindex_end]
+            rel_true = true[eindex_begin:eindex_end]
+            tp, tn, fp, fn = evaluate_results(rel_true, rel_pred)
+            if (tp+fn != 0 and tp/(tp+fn) < 0.7) or (tn+fp != 0 and tn/(tn+fp) < 0.5):
+                outfile.write(str(int(current_event))+' '+str(int(current_jet))+'\n')
+                total_bad += 1
+            total += 1
+        else:
+            ntracks += 1
+
+        if i != len(event_list):
+            current_event = event_list[i]
+            current_jet = jet_list[i]
+    
+    print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total, total))
+
+
 def main(argv):
     gROOT.SetBatch(True)
-    
-    print("Importing input data.")
 
+    #parse command line arguments
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-r", "--runnumber", type=str, default=0, dest="runnumber", help="unique identifier for current run")
+    parser.add_argument("-l", "--lr", type=float, default=0.001, dest="learning_rate", help="learning rate for training")
+    parser.add_argument("-e", "--epochs", type=int, default=20, dest="nepochs", help="number of epochs for training")
+    parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
+    parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
+    parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
+    parser.add_argument("-n", "--normed", type=bool, default=True, dest="use_normed", help="choose whether to use normalized features or not")
+    args = parser.parse_args()
+
+    runnumber = args.runnumber
+    learning_rate = args.learning_rate
+    nepochs = args.nepochs
+    infile_name = args.infile_name
+    infile_path = args.data_dir
+    outfile_path = args.output_dir
+    use_normed = args.use_normed
+
+    print("Importing input data.")
     start_time = time.time()
+    
+    #set relevant filenames
+    if use_normed:
+        ext = ".normed"
+    else:
+        ext = ""
+    paramfile_name = infile_path+infile_name+"_params"
+    train_infile_name = infile_path+infile_name+"_train"+ext+".bin"
+    val_infile_name = infile_path+infile_name+"_val"+ext+".bin"
+    test_infile_name = infile_path+infile_name+"_test"+ext+".bin"
+    registerfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_register"
+    checkpointfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_model.pt"
+
     nnfeatures = (dgl.load_graphs(train_infile_name, [0]))[0][0].ndata['features'].size()[1]
     
     #read in values from parameter file
@@ -117,8 +163,8 @@ def main(argv):
     print("")
 
     #load existing checkpoint
-    if load_checkpoint and os.path.exists(checkpoint_path):
-        checkpoint = th.load(checkpoint_path)
+    if load_checkpoint and os.path.exists(checkpointfile_name):
+        checkpoint = th.load(checkpointfile_name)
         model.load_state_dict(checkpoint['model_state_dict'])
         opt.load_state_dict(checkpoint['optimizer_state_dict'])
         start_epoch = checkpoint['epoch']+1
@@ -163,7 +209,7 @@ def main(argv):
         train_loss_array[epoch-1] = train_loss_array[epoch-1]/total_labels
 
         #save checkpoint
-        th.save({'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': opt.state_dict()}, checkpoint_path)
+        th.save({'epoch': epoch, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': opt.state_dict()}, checkpointfile_name)
 
         #validation
         total_labels = 0
@@ -207,6 +253,8 @@ def main(argv):
         print('Validation results: {} TP, {} FP, {} TN, {} FN. Time elapsed: {}s.\n'.format(tp, fp, tn, fn, e_time))
 
     print("Training finished. Evaluating model.\n")
+    
+    registerfile = open(registerfile_name, "w")
 
     #testing
     tp = tn = fp = fn = 0
@@ -224,11 +272,13 @@ def main(argv):
         #process batch
         test_batch = test_batch.to(device)
         node_features = test_batch.ndata['features']
+        node_info = test_batch.ndata['info'].cpu().numpy()
         edge_labels = test_batch.edata['labels']
         
         #evaluate results
         pred = sig(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy().flatten().round().astype(int)
         true = test_batch.edata['labels'].cpu().numpy().flatten().astype(int)
+        print_bad_events(pred, true, node_info, registerfile) #output list of events with bad performance to use in truth.py
         tpi, tni, fpi, fni = evaluate_results(true, pred)
         tp += tpi
         tn += tni
@@ -249,7 +299,7 @@ def main(argv):
     plt.plot(range(nepochs), val_loss_array, label="Validation")
     plt.legend()
     plt.xlabel("Epoch")
-    plt.savefig("lossplot.png")
+    plt.savefig(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_lossplot.png")
 
 
 if __name__ == '__main__':

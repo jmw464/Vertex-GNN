@@ -3,18 +3,35 @@
 import os,sys,math,glob,ROOT
 import numpy as np
 import h5py
+import argparse
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas, TTree
+
 np.set_printoptions(threshold=sys.maxsize)
 
-max_entries = 10000000 #max number of jets
-remove_pv = True
-jetpt_cut = 25000
-jeteta_cut = -10000
-trackpt_cut = -10000
 
-#implement cuts for a given event
+#############################################SCRIPT PARAMS#################################################
+
+remove_pv = True
+jetpt_cut = 20000 #20 GeV
+jeteta_cut = 2.5 #edge of detector
+trackpt_cut = 600 #600 MeV
+tracketa_cut = 2.5 #edge of detector
+trackz0_cut = 25
+
+###########################################################################################################
+
+
+#implement cuts on jet level
 def check_jet(entry, jet):
-    if entry.jet_pt[jet] > jetpt_cut and entry.jet_eta[jet] > jeteta_cut:
+    if entry.jet_pt[jet] > jetpt_cut and abs(entry.jet_eta[jet]) < jeteta_cut:
+        return True
+    else:
+        return False
+
+
+#implement cuts on track level
+def check_track(entry, jet, track):
+    if entry.jet_trk_pt[jet][track] > trackpt_cut and abs(entry.jet_trk_eta[jet][track]) < tracketa_cut and abs(entry.jet_trk_z0[jet][track]) < trackz0_cut:
         return True
     else:
         return False
@@ -23,22 +40,22 @@ def check_jet(entry, jet):
 def main(argv):
     gROOT.SetBatch(True)
     
-    ntuple = TFile("/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/raw/user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007.root")
-    #ntuple = TFile('/global/homes/t/toyamaza/workdir/ctag/data/ntuples/v10/output_WpHbb_0.root')
-    tree = ntuple.Get("bTag_AntiKt4EMPFlowJets_BTagging201903;19")
-    
-    outfile = h5py.File("/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/Btag_07_19_cut.hdf5", "w")
-    
-    #tot_events = 0
-    #tot_jets = 0
-    #tot_tracks = 0
-    #for ientry,entry in enumerate(tree):
-        #njets = entry.njets
-        #tot_events += 1
-        #tot_jets += njets
-        #for i in range(njets):
-            #tot_tracks += entry.jet_trk_pt[i].size()
+    #parse command line arguments
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-n", "--ntuple", type=str, required=True, dest="ntuple", help="path of ntuple to be processed")
+    parser.add_argument("-t", "--tree", type=str, default="bTag_AntiKt4EMPFlowJets_BTagging201903", dest="tree", help="name of tree in ntuple")
+    parser.add_argument("-e", "--entries", type=int, default=1000000, dest="max_entries", help="maximum number of entries to be processed")
+    parser.add_argument("-d", "--data_dir", type=str, required=True, dest="outfile_dir", help="name of directory to save hdf5 file in")
+    parser.add_argument("-s", "--dataset", type=str, required=True, dest="outfile_name", help="name of dataset to create (without hdf5 extension)")
+    args = parser.parse_args()
 
+    max_entries = args.max_entries
+
+    ntuple = TFile(args.ntuple)
+    tree = ntuple.Get(args.tree)
+   
+    outfile = h5py.File(args.outfile_dir+args.outfile_name+".hdf5", "w")
+    
     info = dict()
     info['event'] = []
     info['jet'] = []
@@ -68,65 +85,99 @@ def main(argv):
     labels['track_vy'] = []
     labels['track_vz'] = []
 
-    total_cut = 0
+    total_cut_tracks = 0
     total_tracks = 0
-    total_events = 0
-    post_cut_events = 0
+    total_jets = 0
+    total_rem_jets = 0
+
     for ientry,entry in enumerate(tree):
 
         njets = entry.njets
-
-        efeatures['event_vx'].append(entry.truth_PVx)
-        efeatures['event_vy'].append(entry.truth_PVy)
-        efeatures['event_vz'].append(entry.truth_PVz)
-
+        rem_jets = 0
         for i in range(njets):
             
             ntracks = entry.jet_trk_pt[i].size()
-            total_tracks += ntracks
-            total_cut += ntracks
-
+            cut_tracks = 0
+            t_pt = []
+            t_eta = []
+            t_theta = []
+            t_phi = []
+            t_d0 = []
+            t_z0 = []
+            t_q = []
+            t_vx = []
+            t_vy = []
+            t_vz = []
             if check_jet(entry, i):
-
-                print("event %d, jet %d with %d tracks"%(ientry, i, ntracks))
-
-                jfeatures['pt'].append(entry.jet_pt[i])
-                jfeatures['eta'].append(entry.jet_eta[i])
-                jfeatures['phi'].append(entry.jet_phi[i])
-
+                
                 #read in track features
-                cut_tracks = 0
                 for j in range(ntracks):
-                    pv_dist = math.sqrt((entry.truth_PVx-entry.jet_trk_vtx_X[i][j])**2 + (entry.truth_PVy-entry.jet_trk_vtx_Y[i][j])**2 + (entry.truth_PVz-entry.jet_trk_vtx_Z[i][j])**2)
-                    pv_criterion = entry.jet_trk_isPV_reco[i][j]#(pv_dist < 1e-4 or entry.jet_trk_vtx_X[i][j] < -990)
-                    if (remove_pv and pv_criterion) or entry.jet_trk_pt[i][j] < trackpt_cut:
-                        cut_tracks += 1
-                    else:
-                        tfeatures['pt'].append(entry.jet_trk_pt[i][j])
-                        tfeatures['eta'].append(entry.jet_trk_eta[i][j])
-                        tfeatures['theta'].append(entry.jet_trk_theta[i][j])
-                        tfeatures['phi'].append(entry.jet_trk_phi[i][j])
-                        tfeatures['d0'].append(entry.jet_trk_d0[i][j])
-                        tfeatures['z0'].append(entry.jet_trk_z0[i][j])
-                        tfeatures['q'].append(entry.jet_trk_charge[i][j])
+                    pv_criterion = entry.jet_trk_isPV_reco[i][j]
+                    if not (remove_pv and pv_criterion) and check_track(entry, i, j):
+                        t_pt.append(entry.jet_trk_pt[i][j])
+                        t_eta.append(entry.jet_trk_eta[i][j])
+                        t_theta.append(entry.jet_trk_theta[i][j])
+                        t_phi.append(entry.jet_trk_phi[i][j])
+                        t_d0.append(entry.jet_trk_d0[i][j])
+                        t_z0.append(entry.jet_trk_z0[i][j])
+                        t_q.append(entry.jet_trk_charge[i][j])
                         
-                        labels['track_vx'].append(entry.jet_trk_vtx_X[i][j])
-                        labels['track_vy'].append(entry.jet_trk_vtx_Y[i][j])
-                        labels['track_vz'].append(entry.jet_trk_vtx_Z[i][j])
+                        t_vx.append(entry.jet_trk_vtx_X[i][j])
+                        t_vy.append(entry.jet_trk_vtx_Y[i][j])
+                        t_vz.append(entry.jet_trk_vtx_Z[i][j])
+                    else:
+                        cut_tracks += 1
                 
-                info['event'].append(ientry)
-                info['jet'].append(i)
-                info['ntracks'].append(ntracks-cut_tracks)
-                
-                total_cut -= (ntracks-cut_tracks)
+                #only write events that have more than one track
+                if ntracks-cut_tracks > 1:
+                    jfeatures['pt'].append(entry.jet_pt[i])
+                    jfeatures['eta'].append(entry.jet_eta[i])
+                    jfeatures['phi'].append(entry.jet_phi[i])
 
-            post_cut_events += 1
+                    tfeatures['pt'].extend(t_pt)
+                    tfeatures['eta'].extend(t_eta)
+                    tfeatures['theta'].extend(t_theta)
+                    tfeatures['phi'].extend(t_phi)
+                    tfeatures['d0'].extend(t_d0)
+                    tfeatures['z0'].extend(t_z0)
+                    tfeatures['q'].extend(t_q)
 
-        total_events += 1
-        if post_cut_events >= max_entries:
+                    labels['track_vx'].extend(t_vx)
+                    labels['track_vy'].extend(t_vy)
+                    labels['track_vz'].extend(t_vz)
+             
+                    t_vx_np = np.array(t_vx)
+                    #t_vx_np = t_vx_np[t_vx_np > -990]
+                    _, counts = np.unique(t_vx_np, return_counts=True)
+                    #print(t_vx_np)
+
+                    info['event'].append(ientry)
+                    info['jet'].append(i)
+                    info['ntracks'].append(ntracks-cut_tracks)
+
+                    total_cut_tracks += cut_tracks
+                    total_tracks += ntracks
+                    rem_jets += 1
+           
+            total_jets += 1
+
+        if rem_jets > 0:
+            efeatures['event_vx'].append(entry.truth_PVx)
+            efeatures['event_vy'].append(entry.truth_PVy)
+            efeatures['event_vz'].append(entry.truth_PVz)
+
+        total_rem_jets += rem_jets
+
+        #output progress
+        sys.stdout.write("\rProcessed {} jets".format(total_rem_jets))
+        sys.stdout.flush()
+
+        if total_rem_jets >= max_entries:
             break
 
-    print("Cut {}% of {} tracks".format(total_cut*100./total_tracks, total_tracks))
+    sys.stdout.write("\rFinished processing. Total jets used from sample: {}".format(total_rem_jets))
+    sys.stdout.flush()
+    print("\nCut {} jets and {}% of {} tracks in remaining jets".format(total_jets-total_rem_jets, total_cut_tracks*100./total_tracks, total_tracks))
 
     grp_info = outfile.create_group("info")
     grp_tfeatures = outfile.create_group("tfeatures")
