@@ -14,7 +14,7 @@ import os,sys,math,glob,time
 import numpy as np
 import argparse
 import ROOT
-from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
+from ROOT import gROOT, TFile, TH1D, TLegend, TCanvas
 import matplotlib.pyplot as plt
 
 #th.set_printoptions(edgeitems=10000)
@@ -32,7 +32,7 @@ gnn_hidfeats = 256 #number of hidden features in GAT layer output
 mlp_hidfeats = 512 #number of hidden features in MLP layers (actual number is twice this since two node feature sets are concatenated)
 
 #script options
-reweight = True #reweight positive labels in loss to make positives and negatives equally important
+reweight = False #reweight positive labels in loss to make positives and negatives equally important
 load_checkpoint = False
 
 ###########################################################################################################
@@ -49,8 +49,8 @@ def evaluate_results(true, pred):
     return tp, tn, fp, fn
 
 
-#print list of jets GNN performs poorly on
-def print_bad_events(pred, true, node_info, outfile):
+#print list of jets GNN performs poorly on and plot overall results
+def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
     event_list = node_info[:,0]
     jet_list = node_info[:,1]
 
@@ -58,7 +58,7 @@ def print_bad_events(pred, true, node_info, outfile):
     current_event = event_list[0]
     current_jet = jet_list[0]
     total_bad = total = 0
-    for i in range(len(event_list)+1):
+    for i in range(len(event_list)+1): #+1 is there to ensure the last jet gets checked as well
         if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i]:
             eindex_begin = eindex_end
             eindex_end += ntracks*(ntracks-1)
@@ -66,6 +66,8 @@ def print_bad_events(pred, true, node_info, outfile):
             rel_pred = pred[eindex_begin:eindex_end]
             rel_true = true[eindex_begin:eindex_end]
             tp, tn, fp, fn = evaluate_results(rel_true, rel_pred)
+            if (tp+fn != 0): tpr_hist.Fill(tp/(tp+fn))
+            if (tn+fp != 0): tnr_hist.Fill(tn/(tn+fp))
             if (tp+fn != 0 and tp/(tp+fn) < 0.7) or (tn+fp != 0 and tn/(tn+fp) < 0.5):
                 outfile.write(str(int(current_event))+' '+str(int(current_jet))+'\n')
                 total_bad += 1
@@ -78,6 +80,8 @@ def print_bad_events(pred, true, node_info, outfile):
             current_jet = jet_list[i]
     
     print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total, total))
+
+    return tpr_hist, tnr_hist
 
 
 def main(argv):
@@ -255,6 +259,8 @@ def main(argv):
     print("Training finished. Evaluating model.\n")
     
     registerfile = open(registerfile_name, "w")
+    tpr_hist = TH1D("tpr_hist", "Results for each jet;Rate;Entries",10,0,1.001) #1.001 is the upper bound so this is inclusive of 1
+    tnr_hist = TH1D("tnr_hist", "Results for each jet;Rate;Entries",10,0,1.001)
 
     #testing
     tp = tn = fp = fn = 0
@@ -278,7 +284,7 @@ def main(argv):
         #evaluate results
         pred = sig(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy().flatten().round().astype(int)
         true = test_batch.edata['labels'].cpu().numpy().flatten().astype(int)
-        print_bad_events(pred, true, node_info, registerfile) #output list of events with bad performance to use in truth.py
+        tpr_hist, tnr_hist = evaluate_events(pred, true, node_info, registerfile, tpr_hist, tnr_hist) #output list of events with bad performance to use in truth.py and plot TPR/TNR
         tpi, tni, fpi, fni = evaluate_results(true, pred)
         tp += tpi
         tn += tni
@@ -293,14 +299,29 @@ def main(argv):
     print('True Negative Rate: {:.4f}'.format(tn/(tn+fp)))
     print('F1 Score {:.4f}'.format(2*tp/(2*tp+fp+fn)))
 
-    #plot loss
+    #plot loss and TPR/TNR
     plt.ioff()
     plt.plot(range(nepochs), train_loss_array, label="Training")
     plt.plot(range(nepochs), val_loss_array, label="Validation")
     plt.legend()
     plt.xlabel("Epoch")
     plt.savefig(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_lossplot.png")
-
+    
+    canv1 = TCanvas("c1", "c1", 800, 600)
+    legend = TLegend(0.78,0.75,0.98,0.95)
+    legend.AddEntry(tpr_hist, "#splitline{TPR}{#splitline{%d entries}{mean=%.2f}}"%(tpr_hist.GetEntries(), tpr_hist.GetMean()), "l")
+    legend.AddEntry(tnr_hist, "#splitline{TNR}{#splitline{%d entries}{mean=%.2f}}"%(tnr_hist.GetEntries(), tnr_hist.GetMean()), "l")
+    tpr_hist.SetLineColorAlpha(4,0.65)
+    tpr_hist.SetLineWidth(3)
+    if tpr_hist.Integral(): tpr_hist.Scale(1./tpr_hist.Integral(), "width")
+    tnr_hist.SetLineColorAlpha(3,0.65)
+    tnr_hist.SetLineWidth(3)
+    if tnr_hist.Integral(): tnr_hist.Scale(1./tnr_hist.Integral(), "width")
+    tpr_hist.Draw()
+    tnr_hist.Draw("SAMES")
+    legend.SetTextSize(0.025)
+    legend.Draw("SAME")
+    canv1.SaveAs(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_tpnrplot.png")
 
 if __name__ == '__main__':
     main(sys.argv)

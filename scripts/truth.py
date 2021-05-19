@@ -131,7 +131,7 @@ def check_track(entry, jet, track):
 
 
 #plot list of histograms with specified labels
-def plot_hist(canv, histlist, labellist, norm, filename, options):
+def plot_hist(canv, histlist, labellist, norm, filename, options, overflow):
     gPad.SetLogy()
     legend = TLegend(0.78,0.95-0.1*len(histlist),0.98,0.95)
     colorlist = [4, 3, 2, 8, 1]
@@ -142,6 +142,8 @@ def plot_hist(canv, histlist, labellist, norm, filename, options):
         mean = histlist[i].GetMean()
         histlist[i].SetLineColorAlpha(colorlist[i],0.65)
         histlist[i].SetLineWidth(3)
+        nbins = histlist[i].GetNbinsX()
+        if overflow: histlist[i].SetBinContent(nbins, histlist[i].GetBinContent(nbins) + histlist[i].GetBinContent(nbins+1))
         if entries and norm: histlist[i].Scale(1./histlist[i].Integral(), "width")
         if i == 0: histlist[i].Draw(options)
         else: histlist[i].Draw(same+options)
@@ -186,11 +188,11 @@ def main(argv):
     hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 20, 0, 20)
     hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 20, 0, 20)
 
-    hist_trk_pt_b = TH1D("trk_pt_b", "Track pT;pT [MeV];Normalized entries", 50, 0, 30000)
-    hist_trk_pt_c = TH1D("trk_pt_c", "Track pT;pT [MeV];Normalized entries", 50, 0, 30000)
-    hist_trk_pt_o = TH1D("trk_pt_o", "Track pT;pT [MeV];Normalized entries", 50, 0, 30000)
-    hist_trk_pt_nm = TH1D("trk_pt_nm", "Track pT;pT [MeV];Normalized entries", 50, 0, 30000)
-    hist_trk_pt_btoc = TH1D("trk_pt_btoc", "Track pT;pT [MeV];Normalized entries", 50, 0, 30000)
+    hist_trk_pt_b = TH1D("trk_pt_b", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
+    hist_trk_pt_c = TH1D("trk_pt_c", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
+    hist_trk_pt_o = TH1D("trk_pt_o", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
+    hist_trk_pt_nm = TH1D("trk_pt_nm", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
+    hist_trk_pt_btoc = TH1D("trk_pt_btoc", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
 
     hist_trk_eta_b = TH1D("trk_eta_b", "Track eta;Eta;Normalized entries", 20, -5, 5)
     hist_trk_eta_c = TH1D("trk_eta_c", "Track eta;Eta;Normalized entries", 20, -5, 5)
@@ -208,6 +210,12 @@ def main(argv):
     hist_no_trk_b = TH1D("no_trk_b", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
     hist_no_trk_c = TH1D("no_trk_c", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
     hist_no_trk_btoc = TH1D("no_trk_btoc", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
+
+    hist_no_trk_jet_b = TH1D("no_trk_jet_b", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
+    hist_no_trk_jet_c = TH1D("no_trk_jet_c", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
+    hist_no_trk_jet_btoc = TH1D("no_trk_jet_btoc", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
+    hist_no_trk_jet_o = TH1D("no_trk_jet_o", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
+    hist_no_trk_jet_nm = TH1D("no_trk_jet_nm", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
 
     hist_frac_trk_b = TH1D("frac_trk_b", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)
     hist_frac_trk_c = TH1D("frac_trk_c", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)
@@ -405,7 +413,7 @@ def main(argv):
                     #go through each track again to calculate relevant quantities for plotting
                     jet_bh_list = np.array([]) #list that stores all bH particles in jet
                     jet_ch_list = np.array([])
-                    jet_trk_btoc_frac = jet_trk_ch_frac = jet_trk_bh_frac = jet_trk_o_frac = jet_trk_nm_frac = 0
+                    jet_trk_btoc = jet_trk_ch = jet_trk_bh = jet_trk_o = jet_trk_nm = 0
                     bh_parent_list = np.array([]) #list that stores all direct bH parent particles in jet
                     ch_parent_list = np.array([])
                     btoc_parent_list = np.array([])
@@ -422,24 +430,25 @@ def main(argv):
                         track_dict[t_barcode].classification = t_class
                 
                         if t_class == 'nm':
-                            jet_trk_nm_frac += 1/len(track_dict)
+
+                            jet_trk_nm += 1
                             hist_trk_pt_nm.Fill(track_dict[t_barcode].pt)
                             hist_trk_eta_nm.Fill(track_dict[t_barcode].eta)
                             hist_trk_phi_nm.Fill(track_dict[t_barcode].phi)
                         elif t_class == 'b':
-                            jet_trk_bh_frac += 1/len(track_dict)
+                            jet_trk_bh += 1
                             hist_trk_pt_b.Fill(track_dict[t_barcode].pt)
                             hist_trk_eta_b.Fill(track_dict[t_barcode].eta)
                             hist_trk_phi_b.Fill(track_dict[t_barcode].phi)
                             bh_parent_list = np.append(bh_parent_list, t_bh_list[0,0])
                         elif t_class == 'c':
-                            jet_trk_ch_frac += 1/len(track_dict)
+                            jet_trk_ch += 1
                             hist_trk_pt_c.Fill(track_dict[t_barcode].pt)
                             hist_trk_eta_c.Fill(track_dict[t_barcode].eta)
                             hist_trk_phi_c.Fill(track_dict[t_barcode].phi)
                             ch_parent_list = np.append(ch_parent_list, t_ch_list[0,0])
                         elif t_class == 'btoc':
-                            jet_trk_btoc_frac += 1/len(track_dict)
+                            jet_trk_btoc += 1
                             hist_trk_pt_btoc.Fill(track_dict[t_barcode].pt)
                             hist_trk_eta_btoc.Fill(track_dict[t_barcode].eta)
                             hist_trk_phi_btoc.Fill(track_dict[t_barcode].phi)
@@ -448,18 +457,23 @@ def main(argv):
                             cH_parent = particle_dict[t_ch_list[0,0]]
                             hist_fl_len_btoc.Fill(np.linalg.norm(bH_parent.dv-cH_parent.dv))
                         else:
-                            jet_trk_o_frac += 1/len(track_dict)
+                            jet_trk_o += 1
                             hist_trk_pt_o.Fill(track_dict[t_barcode].pt)
                             hist_trk_eta_o.Fill(track_dict[t_barcode].eta)
                             hist_trk_phi_o.Fill(track_dict[t_barcode].phi)
 
                     #fill histograms
                     if len(track_dict) != 0:
-                        hist_frac_trk_b.Fill(jet_trk_bh_frac)
-                        hist_frac_trk_c.Fill(jet_trk_ch_frac)
-                        hist_frac_trk_o.Fill(jet_trk_o_frac)
-                        hist_frac_trk_btoc.Fill(jet_trk_btoc_frac)
-                        hist_frac_trk_nm.Fill(jet_trk_nm_frac)
+                        hist_no_trk_jet_b.Fill(jet_trk_bh)
+                        hist_no_trk_jet_c.Fill(jet_trk_ch)
+                        hist_no_trk_jet_o.Fill(jet_trk_o)
+                        hist_no_trk_jet_btoc.Fill(jet_trk_btoc)
+                        hist_no_trk_jet_nm.Fill(jet_trk_nm)
+                        hist_frac_trk_b.Fill(jet_trk_bh/len(track_dict))
+                        hist_frac_trk_c.Fill(jet_trk_ch/len(track_dict))
+                        hist_frac_trk_o.Fill(jet_trk_o/len(track_dict))
+                        hist_frac_trk_btoc.Fill(jet_trk_btoc/len(track_dict))
+                        hist_frac_trk_nm.Fill(jet_trk_nm/len(track_dict))
 
                         bh_parent_list, bh_unique = np.unique(bh_parent_list, return_counts=True)
                         for incidence in bh_unique:
@@ -509,17 +523,18 @@ def main(argv):
         
     canv1 = TCanvas("c1", "c1", 800, 600)
 
-    plot_hist(canv1, [hist_frac_trk_b, hist_frac_trk_c, hist_frac_trk_btoc], ["bH", "prompt cH", "bH->cH"], False, base_filename+"_frac_trk.png", "")
-    plot_hist(canv1, [hist_no_char_b, hist_no_char_c, hist_no_char_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_char.png", "")
-    plot_hist(canv1, [hist_no_trk_b, hist_no_trk_c, hist_no_trk_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_trk.png", "")
-    plot_hist(canv1, [hist_trk_pt_b, hist_trk_pt_c, hist_trk_pt_btoc, hist_trk_pt_o, hist_trk_pt_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_pt.png", "HIST")
-    plot_hist(canv1, [hist_trk_eta_b, hist_trk_eta_c, hist_trk_eta_btoc, hist_trk_eta_o, hist_trk_eta_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_eta.png", "HIST")
-    plot_hist(canv1, [hist_trk_phi_b, hist_trk_phi_c, hist_trk_phi_btoc, hist_trk_phi_o, hist_trk_phi_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_phi.png", "HIST")
-    plot_hist(canv1, [hist_no_trk_acc, hist_no_trk_rej], ["after cuts", "before cuts"], False, base_filename+"_no_trk_cuts.png", "")
-    plot_hist(canv1, [hist_trk_pv_d0_acc, hist_trk_o_d0_acc, hist_trk_nm_d0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_acc.png", "HIST")
-    plot_hist(canv1, [hist_trk_pv_z0_acc, hist_trk_o_z0_acc, hist_trk_nm_z0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_acc.png", "HIST")
-    plot_hist(canv1, [hist_trk_pv_d0_rej, hist_trk_o_d0_rej, hist_trk_nm_d0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_rej.png", "HIST")
-    plot_hist(canv1, [hist_trk_pv_z0_rej, hist_trk_o_z0_rej, hist_trk_nm_z0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_rej.png", "HIST")
+    plot_hist(canv1, [hist_frac_trk_b, hist_frac_trk_c, hist_frac_trk_btoc], ["bH", "prompt cH", "bH->cH"], False, base_filename+"_frac_trk.png", "", True)
+    plot_hist(canv1, [hist_no_char_b, hist_no_char_c, hist_no_char_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_char.png", "", True)
+    plot_hist(canv1, [hist_no_trk_b, hist_no_trk_c, hist_no_trk_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_trk.png", "", True)
+    plot_hist(canv1, [hist_no_trk_jet_b, hist_no_trk_jet_c, hist_no_trk_jet_btoc, hist_no_trk_jet_o, hist_no_trk_jet_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_no_trk_jet.png", "", True)
+    plot_hist(canv1, [hist_trk_pt_b, hist_trk_pt_c, hist_trk_pt_btoc, hist_trk_pt_o, hist_trk_pt_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_pt.png", "HIST", True)
+    plot_hist(canv1, [hist_trk_eta_b, hist_trk_eta_c, hist_trk_eta_btoc, hist_trk_eta_o, hist_trk_eta_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_eta.png", "HIST", True)
+    plot_hist(canv1, [hist_trk_phi_b, hist_trk_phi_c, hist_trk_phi_btoc, hist_trk_phi_o, hist_trk_phi_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_phi.png", "HIST", True)
+    plot_hist(canv1, [hist_no_trk_acc, hist_no_trk_rej], ["after cuts", "before cuts"], False, base_filename+"_no_trk_cuts.png", "", True)
+    plot_hist(canv1, [hist_trk_pv_d0_acc, hist_trk_o_d0_acc, hist_trk_nm_d0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_acc.png", "HIST", True)
+    plot_hist(canv1, [hist_trk_pv_z0_acc, hist_trk_o_z0_acc, hist_trk_nm_z0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_acc.png", "HIST", True)
+    plot_hist(canv1, [hist_trk_pv_d0_rej, hist_trk_o_d0_rej, hist_trk_nm_d0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_rej.png", "HIST", True)
+    plot_hist(canv1, [hist_trk_pv_z0_rej, hist_trk_o_z0_rej, hist_trk_nm_z0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_rej.png", "HIST", True)
 
     gPad.SetLogy()
     hist_fl_len_btoc.Draw()
