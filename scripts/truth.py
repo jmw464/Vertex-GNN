@@ -4,7 +4,7 @@ import os,sys,math,ROOT,glob
 import numpy as np
 import argparse
 from ROOT import TFile, TH1D, TH1I, gROOT, TCanvas, gPad, TLegend
-
+import time
 
 #############################################SCRIPT PARAMS#################################################
 
@@ -12,13 +12,13 @@ remove_pv = True
 
 jetpt_cut = 20000 #20 GeV
 jeteta_cut = 2.5 #edge of detector
-trackpt_cut = 600 #600 MeV
+trackpt_cut = 650 #600 MeV
 tracketa_cut = 2.5 #edge of detector
-trackz0_cut = 25
+trackz0_cut = 20
 
 #set thresholds for track classification
-threshold_dist = 50 #maximum distance between HF vertex and track vertex
-threshold_level = 5 #maximum degrees of removal between HF particle and track particle (or bH and cH for bH->cH)
+threshold_dist = 5 #maximum distance between HF vertex and track vertex
+bc_threshold_dist = 5 #maximum distance between b decay vertex and c production vertex for bH->cH tracks
 
 ###########################################################################################################
 
@@ -43,17 +43,9 @@ class truth_track():
         self.pt = pt
         self.eta = eta
         self.phi = phi
-        self.bh_ancestors = np.array([])
-        self.ch_ancestors = np.array([])
+        self.hf_ancestor = -1 #overall HF ancestor (always corresponds to b hadron for bH->cH tracks)
+        self.btoc_ancestor = -1 #direct charm ancestor for bH->cH tracks from charm hadrons
         self.classification = ""
-
-    def add_bh_ancestor(self, barcode):
-        self.bh_ancestors = np.append(self.bh_ancestors, barcode)
-        self.bh_ancestors = np.reshape(self.bh_ancestors, (int(len(self.bh_ancestors)/2),2))
-
-    def add_ch_ancestor(self, barcode):
-        self.ch_ancestors = np.append(self.ch_ancestors, barcode)
-        self.ch_ancestors = np.reshape(self.ch_ancestors, (int(len(self.ch_ancestors)/2),2))
 
 
 def id_particle(pdgid):
@@ -70,48 +62,61 @@ def id_particle(pdgid):
         return 'other'
 
 
-def get_ancestors(particle, particle_dict, particle_list, level): #particle_list stores barcodes to avoid double counting
+#function to retrieve most recent independent (non-interrelated) HF relatives (descendants or antecedents) of a given particle
+def get_hf_relatives(particle, particle_dict, particle_list, mode, skip): #skip is used when examining the HF ancestors of a HF hadron (so the function can enter the recursive part)
     barcode = particle.barcode
     pdgid = particle.pdgid
-
-    #if barcode not in particle_list:
-    particle_list = np.append(particle_list, np.array([barcode, level]))
-        
-    for parent in particle.parents:
-        particle_list = get_ancestors(particle_dict[parent], particle_dict, particle_list, level+1)
+    label = id_particle(pdgid)
     
+    if not skip and (label == 'ch' or label == 'bh'):
+        particle_list = np.append(particle_list, barcode)
+        return particle_list #stop searching branch if HF relative is found
+    
+    if mode == 'a':
+        for parent in particle.parents:
+            particle_list = get_hf_relatives(particle_dict[parent], particle_dict, particle_list, mode, 0)
+    elif mode == 'd':
+        for child in particle.children:
+            particle_list = get_hf_relatives(particle_dict[child], particle_dict, particle_list, mode, 0)
+
     return particle_list
 
 
-def classify_track(barcode, particle_dict, track_dict):
-    bh_ancestors = track_dict[barcode].bh_ancestors
-    ch_ancestors = track_dict[barcode].ch_ancestors
-    track_vertex = track_dict[barcode].vertex
+def classify_track(index, particle_dict, track_dict):
+    barcode = track_dict[index].barcode
+    hf_barcode = track_dict[index].hf_ancestor
+    track_vertex = track_dict[index].vertex
+    if hf_barcode != -1: primary_distance = np.linalg.norm(track_vertex-particle_dict[hf_barcode].dv)
 
-    if track_vertex[0] < -990:
-        return "nm" #no truth particle match
-
-    if bh_ancestors.size != 0 and ch_ancestors.size != 0:
-        bh_parent = bh_ancestors[0]
-        ch_parent = ch_ancestors[0]
-        bh_parent_dv = particle_dict[bh_parent[0]].dv
-        ch_parent_dv = particle_dict[ch_parent[0]].dv
-        if ch_parent[1] < bh_parent[1] and np.linalg.norm(bh_parent_dv-ch_parent_dv) <= threshold_dist and abs(bh_parent[1]-ch_parent[1]) <= threshold_level and np.linalg.norm(ch_parent_dv-track_vertex) <= threshold_dist and ch_parent[1] <= threshold_level:
-            return "btoc" #b->c
-
-    if bh_ancestors.size != 0 and (ch_ancestors.size == 0 or bh_ancestors[0,1] < ch_ancestors[0,1]):
-        bh_parent = bh_ancestors[0]
-        parent_dv = particle_dict[bh_parent[0]].dv
-        if np.linalg.norm(parent_dv-track_vertex) <= threshold_dist and bh_parent[1] <= threshold_level:
-            return "b" #b
-
-    if ch_ancestors.size != 0 and (bh_ancestors.size == 0 or bh_ancestors[0,1] > ch_ancestors[0,1]):
-        ch_parent = ch_ancestors[0]
-        parent_dv = particle_dict[ch_parent[0]].dv
-        if np.linalg.norm(parent_dv-track_vertex) <= threshold_dist and ch_parent[1] <= threshold_level:
-            return "c" #prompt c
-    
-    return "o" #other decay
+    min_distance = second_ancestor = -1
+    if barcode < -990:
+        return 'nm' #no truth particle match
+    elif hf_barcode != -1 and id_particle(particle_dict[hf_barcode].pdgid) == 'ch' and primary_distance <= threshold_dist:
+        ch_barcodes = get_hf_relatives(particle_dict[hf_barcode], particle_dict, np.array([]), 'a', 1)
+        for ch_barcode in ch_barcodes:
+            distance = np.linalg.norm(particle_dict[hf_barcode].pv - particle_dict[ch_barcode].dv)
+            if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[ch_barcode].pdgid) == 'bh':
+                min_distance = distance
+                second_ancestor = ch_barcode
+        if second_ancestor != -1 and min_distance <= bc_threshold_dist:
+            track_dict[index].btoc_ancestor = track_dict[index].hf_ancestor
+            track_dict[index].hf_ancestor = second_ancestor
+            return 'btoc'
+        else:
+            return 'c'
+    elif hf_barcode != -1 and id_particle(particle_dict[hf_barcode].pdgid) == 'bh' and primary_distance <= threshold_dist:
+        #bh_barcodes = get_hf_relatives(particle_dict[hf_barcode], particle_dict, np.array([]), 'd', 1)
+        #for bh_barcode in bh_barcodes:
+        #    distance = np.linalg.norm(particle_dict[hf_barcode].dv - particle_dict[bh_barcode].pv)
+        #    if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[bh_barcode].pdgid) == 'ch':
+        #        min_distance = distance
+        #        second_ancestor = bh_barcode
+        #if second_ancestor != -1 and min_distance <= bc_threshold_dist:
+        #    return 'btoc'
+        #else:
+        return 'b'
+    else:
+        return 'o'
 
 
 #implement cuts on jet level
@@ -134,7 +139,7 @@ def check_track(entry, jet, track):
 def plot_hist(canv, histlist, labellist, norm, filename, options, overflow):
     gPad.SetLogy()
     legend = TLegend(0.78,0.95-0.1*len(histlist),0.98,0.95)
-    colorlist = [4, 3, 2, 8, 1]
+    colorlist = [4, 8, 2, 6, 1]
     if options: same = "SAMES "
     else: same = "SAMES"
     for i in range(len(histlist)):
@@ -166,7 +171,7 @@ def main(argv):
     parser.add_argument("-n", "--ntuple", type=str, required=True, dest="ntuple", help="path of ntuple to be processed")
     parser.add_argument("-t", "--tree", type=str, default="bTag_AntiKt4EMPFlowJets_BTagging201903", dest="tree", help="name of tree in ntuple")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where plots should be stored")
-    parser.add_argument("-b", "--bad_jets", type=bool, default=True, dest="only_bad_events", help="indicate whether to plot from list of bad jets (True) or from full dataset (False)")
+    parser.add_argument("-b", "--bad_jets", type=int, default=1, dest="only_bad_events", help="indicate whether to plot from list of bad jets (True) or from full dataset (False)")
     args = parser.parse_args()
 
     maxentries = args.maxentries #processing only stops after every jet in an event is read in -> first event that passes maxentries jets is last one
@@ -174,7 +179,7 @@ def main(argv):
     dataname = args.infile_name
     savepath = args.output_dir
     only_bad_events = args.only_bad_events
-    
+  
     ntuple = TFile(args.ntuple)
     tree = ntuple.Get(args.tree)
 
@@ -183,10 +188,16 @@ def main(argv):
     hist_no_char_c = TH1D("no_char_c", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
     hist_no_char_btoc = TH1D("no_char_btoc", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
     
-    hist_fl_len_btoc = TH1D("fl_len_btoc", "Distance between bH and track vertices in bH->cH event;Distance [cm];Entries", 20, 0, 50)
+    hist_fl_len_b = TH1D("fl_len_b", "Distance between HF hadron decay vertex and track vertex;Distance [cm];Entries", 20, 0, 50)
+    hist_fl_len_c = TH1D("fl_len_c", "Distance between HF hadron decay vertex and track vertex;Distance [cm];Entries", 20, 0, 50)
+    hist_fl_len_btoc = TH1D("fl_len_btoc", "Distance between HF hadron decay vertex and track vertex;Distance [cm];Entries", 20, 0, 50)
 
-    hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 20, 0, 20)
-    hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 20, 0, 20)
+    hist_trk_vtx_dist_b = TH1D("trk_vtx_dist_b", "Distance between track PVs within SV;Distance [cm];Entries", 20, 0, 50)
+    hist_trk_vtx_dist_c = TH1D("trk_vtx_dist_c", "Distance between track PVs within SV;Distance [cm];Entries", 20, 0, 50)
+    hist_trk_vtx_dist_btoc = TH1D("trk_vtx_dist_btoc", "Distance between track PVs within SV;Distance [cm];Entries", 20, 0, 50)
+
+    hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
+    hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
 
     hist_trk_pt_b = TH1D("trk_pt_b", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
     hist_trk_pt_c = TH1D("trk_pt_c", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
@@ -223,19 +234,21 @@ def main(argv):
     hist_frac_trk_nm = TH1D("frac_trk_nm", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)
     hist_frac_trk_btoc = TH1D("frac_trk_btoc", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)
 
-    hist_trk_pv_d0_rej = TH1D("trk_pv_d0_rej", "d0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_pv_d0_acc = TH1D("trk_pv_d0_acc", "d0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_nm_d0_rej = TH1D("trk_nm_d0_rej", "d0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_nm_d0_acc = TH1D("trk_nm_d0_acc", "d0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_o_d0_rej = TH1D("trk_o_d0_rej", "d0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_o_d0_acc = TH1D("trk_o_d0_acc", "d0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_pv_d0_rej = TH1D("trk_pv_d0_rej", "d0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_pv_d0_acc = TH1D("trk_pv_d0_acc", "d0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_nm_d0_rej = TH1D("trk_nm_d0_rej", "d0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_nm_d0_acc = TH1D("trk_nm_d0_acc", "d0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_o_d0_rej = TH1D("trk_o_d0_rej", "d0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_o_d0_acc = TH1D("trk_o_d0_acc", "d0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
 
-    hist_trk_pv_z0_rej = TH1D("trk_pv_z0_rej", "z0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_pv_z0_acc = TH1D("trk_pv_z0_acc", "z0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_nm_z0_rej = TH1D("trk_nm_z0_rej", "z0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_nm_z0_acc = TH1D("trk_nm_z0_acc", "z0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_o_z0_rej = TH1D("trk_o_z0_rej", "z0 of rejected tracks;Distance [cm];Normalized entries", 100, -100, 100)
-    hist_trk_o_z0_acc = TH1D("trk_o_z0_acc", "z0 of accepted tracks;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_pv_z0_rej = TH1D("trk_pv_z0_rej", "z0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_pv_z0_acc = TH1D("trk_pv_z0_acc", "z0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_nm_z0_rej = TH1D("trk_nm_z0_rej", "z0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_nm_z0_acc = TH1D("trk_nm_z0_acc", "z0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_o_z0_rej = TH1D("trk_o_z0_rej", "z0 of tracks associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+    hist_trk_o_z0_acc = TH1D("trk_o_z0_acc", "z0 of tracks not associated with reconstructed PV;Distance [cm];Normalized entries", 100, -100, 100)
+
+    start_time = time.time()
 
     #read in dictionary of bad events
     registerfilename = savepath+runnumber+"/"+dataname+"_"+runnumber+"_register"
@@ -261,7 +274,7 @@ def main(argv):
 
         #only process events in the register if only_bad_events is true
         if not only_bad_events or ientry in bad_events.keys():
-
+            
             njets = entry.njets
             particle_dict = {}
 
@@ -332,7 +345,7 @@ def main(argv):
                     #count tracks that pass cuts to know which jets to skip entirely
                     rem_trk = 0
                     for j in range(nTrack):
-                        if check_track(entry, i, j) and (not remove_pv or not entry.jet_trk_isPV_reco[i][j]):
+                        if (not remove_pv or not entry.jet_trk_isPV_reco[i][j]) and check_track(entry, i, j):
                             rem_trk += 1
                     if rem_trk <= 1:
                         continue
@@ -349,10 +362,10 @@ def main(argv):
                                 trk_phi = entry.jet_trk_phi[i][j]
                                 trk_pdgId = entry.jet_trk_pdg_id[i][j]
                                 trk_barcode = entry.jet_trk_barcode[i][j]
+                                
+                                track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi)
 
-                                track_dict[trk_barcode] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi)
-
-                                if trk_vertex[0] < -990:
+                                if trk_barcode < 0:
                                     hist_trk_nm_d0_acc.Fill(entry.jet_trk_d0[i][j])
                                     hist_trk_nm_z0_acc.Fill(entry.jet_trk_z0[i][j])
                                 elif np.linalg.norm(trk_vertex-primary_vertex) < 1e-4:
@@ -374,93 +387,102 @@ def main(argv):
                                 else:
                                     hist_trk_o_d0_rej.Fill(entry.jet_trk_d0[i][j])
                                     hist_trk_o_z0_rej.Fill(entry.jet_trk_z0[i][j])
-
+                        
+                        else:
+                            jet_cut_trk += 1
+                            
                     hist_no_trk_acc.Fill(len(track_dict))
                     hist_no_trk_rej.Fill(len(track_dict)+jet_cut_trk)
 
                     jet_npart_trk = 0 #count tracks not associated with any particles
-                    for t_barcode in track_dict:
-                        track = track_dict[t_barcode]
+                    for ti in track_dict:
+                        track = track_dict[ti]
 
                         #don't process tracks that don't have associated truth particles
                         if track.pdgid == -999:
                             jet_npart_trk += 1
                             continue
 
-                        #get ancestors of track particle
+                        #get direct HF ancestors of track particle
+                        t_barcode = track.barcode
                         track_particle = particle_dict[t_barcode]
                         ancestors = np.array([])
-                        ancestors = get_ancestors(track_particle, particle_dict, ancestors, 0)
-                        ancestors = np.reshape(ancestors, (int(len(ancestors)/2),2)) #reshape into array of [barcode, level] elements
-                        ancestors = ancestors[np.argsort(ancestors[:,1])] #sort based on level
-                        _, indices = np.unique(ancestors[:,0],return_index=True)
-                        ancestors = np.array([ancestors[index] for index in sorted(indices)]) #only keep unique barcodes at the lowest level they appear
+                        ancestors = get_hf_relatives(track_particle, particle_dict, ancestors, 'a', 0)
+                        ancestors = np.unique(ancestors) #only keep unique barcodes
 
-                        #check ancestor list for bH and cH particles
+                        #check which ancestor will be marked as primary (by checking distance between HF DV and track PV)
+                        min_distance = direct_ancestor = -1
                         for ancestor in ancestors:
-                            a_barcode = ancestor[0]
-                            a_level = ancestor[1]
-                            a_particle = particle_dict[a_barcode]
-                            a_id = id_particle(a_particle.pdgid)
+                            distance = np.linalg.norm(track_particle.pv - particle_dict[ancestor].dv)
+                            if min_distance == -1 or distance < min_distance:
+                                min_distance = distance
+                                direct_ancestor = ancestor
+                        track.hf_ancestor = direct_ancestor
 
-                            #keep track of bH and cH association of each track
-                            if a_id == 'ch':
-                                track_dict[t_barcode].add_ch_ancestor(np.array([a_barcode, a_level]))
-
-                            elif a_id == 'bh':
-                                track_dict[t_barcode].add_bh_ancestor(np.array([a_barcode, a_level]))
-
-                    #go through each track again to calculate relevant quantities for plotting
-                    jet_bh_list = np.array([]) #list that stores all bH particles in jet
-                    jet_ch_list = np.array([])
                     jet_trk_btoc = jet_trk_ch = jet_trk_bh = jet_trk_o = jet_trk_nm = 0
                     bh_parent_list = np.array([]) #list that stores all direct bH parent particles in jet
                     ch_parent_list = np.array([])
                     btoc_parent_list = np.array([])
+                    
+                    #make first attempt at track classification (still need to correct some bH labels to bH->cH after this point)
+                    for ti in track_dict:
+                        t_class = classify_track(ti, particle_dict, track_dict)
+                        track_dict[ti].classification = t_class
+                        if t_class == 'btoc':
+                            btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
 
-                    for t_barcode in track_dict:
-                        #create list of all bH and cH particles in one jet
-                        t_bh_list = track_dict[t_barcode].bh_ancestors
-                        t_ch_list = track_dict[t_barcode].ch_ancestors
-                        if t_bh_list.size != 0: jet_bh_list = np.append(jet_bh_list, t_bh_list[:,0])
-                        if t_ch_list.size != 0: jet_ch_list = np.append(jet_ch_list, t_ch_list[:,0])
-                
-                        #classify tracks and save classification
-                        t_class = classify_track(t_barcode, particle_dict, track_dict)
-                        track_dict[t_barcode].classification = t_class
-                
+                    #fix classifications and fill histograms
+                    for ti in track_dict:
+                        if track_dict[ti].classification == 'b' and track_dict[ti].hf_ancestor in btoc_parent_list:
+                            track_dict[ti].classification = 'btoc'
+                            btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
+                        t_class = track_dict[ti].classification
+              
+                        parent = track_dict[ti].hf_ancestor
                         if t_class == 'nm':
-
                             jet_trk_nm += 1
-                            hist_trk_pt_nm.Fill(track_dict[t_barcode].pt)
-                            hist_trk_eta_nm.Fill(track_dict[t_barcode].eta)
-                            hist_trk_phi_nm.Fill(track_dict[t_barcode].phi)
+                            hist_trk_pt_nm.Fill(track_dict[ti].pt)
+                            hist_trk_eta_nm.Fill(track_dict[ti].eta)
+                            hist_trk_phi_nm.Fill(track_dict[ti].phi)
                         elif t_class == 'b':
                             jet_trk_bh += 1
-                            hist_trk_pt_b.Fill(track_dict[t_barcode].pt)
-                            hist_trk_eta_b.Fill(track_dict[t_barcode].eta)
-                            hist_trk_phi_b.Fill(track_dict[t_barcode].phi)
-                            bh_parent_list = np.append(bh_parent_list, t_bh_list[0,0])
+                            hist_trk_pt_b.Fill(track_dict[ti].pt)
+                            hist_trk_eta_b.Fill(track_dict[ti].eta)
+                            hist_trk_phi_b.Fill(track_dict[ti].phi)
+                            bh_parent_list = np.append(bh_parent_list, track_dict[ti].hf_ancestor)
+                            hist_fl_len_b.Fill(np.linalg.norm(particle_dict[parent].dv-track_dict[ti].vertex))
                         elif t_class == 'c':
                             jet_trk_ch += 1
-                            hist_trk_pt_c.Fill(track_dict[t_barcode].pt)
-                            hist_trk_eta_c.Fill(track_dict[t_barcode].eta)
-                            hist_trk_phi_c.Fill(track_dict[t_barcode].phi)
-                            ch_parent_list = np.append(ch_parent_list, t_ch_list[0,0])
+                            hist_trk_pt_c.Fill(track_dict[ti].pt)
+                            hist_trk_eta_c.Fill(track_dict[ti].eta)
+                            hist_trk_phi_c.Fill(track_dict[ti].phi)
+                            ch_parent_list = np.append(ch_parent_list, track_dict[ti].hf_ancestor)
+                            hist_fl_len_c.Fill(np.linalg.norm(particle_dict[parent].dv-track_dict[ti].vertex))
                         elif t_class == 'btoc':
                             jet_trk_btoc += 1
-                            hist_trk_pt_btoc.Fill(track_dict[t_barcode].pt)
-                            hist_trk_eta_btoc.Fill(track_dict[t_barcode].eta)
-                            hist_trk_phi_btoc.Fill(track_dict[t_barcode].phi)
-                            btoc_parent_list = np.append(btoc_parent_list, t_ch_list[0,0])
-                            bH_parent = particle_dict[t_bh_list[0,0]]
-                            cH_parent = particle_dict[t_ch_list[0,0]]
-                            hist_fl_len_btoc.Fill(np.linalg.norm(bH_parent.dv-cH_parent.dv))
+                            hist_trk_pt_btoc.Fill(track_dict[ti].pt)
+                            hist_trk_eta_btoc.Fill(track_dict[ti].eta)
+                            hist_trk_phi_btoc.Fill(track_dict[ti].phi)
+                            cH_parent = track_dict[ti].btoc_ancestor
+                            hist_fl_len_btoc.Fill(np.linalg.norm(particle_dict[parent].dv-track_dict[ti].vertex))
                         else:
                             jet_trk_o += 1
-                            hist_trk_pt_o.Fill(track_dict[t_barcode].pt)
-                            hist_trk_eta_o.Fill(track_dict[t_barcode].eta)
-                            hist_trk_phi_o.Fill(track_dict[t_barcode].phi)
+                            hist_trk_pt_o.Fill(track_dict[ti].pt)
+                            hist_trk_eta_o.Fill(track_dict[ti].eta)
+                            hist_trk_phi_o.Fill(track_dict[ti].phi)
+
+                    #calculate distances between tracks in a particular SV
+                    for ti in track_dict:
+                        anc_i = track_dict[ti].hf_ancestor
+                        for tj in track_dict:
+                            anc_j = track_dict[tj].hf_ancestor
+                            if ti != tj and anc_i == anc_j:
+                                if track_dict[tj].classification == 'b' and track_dict[ti].classification == 'b':
+                                    hist_trk_vtx_dist_b.Fill(np.linalg.norm(track_dict[ti].vertex-track_dict[tj].vertex))
+                                elif track_dict[tj].classification == 'c' and track_dict[ti].classification == 'c':
+                                    hist_trk_vtx_dist_c.Fill(np.linalg.norm(track_dict[ti].vertex-track_dict[tj].vertex))
+                                elif track_dict[tj].classification == 'btoc' and track_dict[ti].classification == 'btoc':
+                                    hist_trk_vtx_dist_btoc.Fill(np.linalg.norm(track_dict[ti].vertex-track_dict[tj].vertex))
 
                     #fill histograms
                     if len(track_dict) != 0:
@@ -508,11 +530,8 @@ def main(argv):
                                     btoc_charged += 1
                             hist_no_char_btoc.Fill(btoc_charged)
 
-                    jet_nbh = np.size(np.unique(jet_bh_list))
-                    jet_nch = np.size(np.unique(jet_ch_list))
-
                     #output progress
-                    sys.stdout.write("\rProcessed {} jets".format(processed_jets))
+                    sys.stdout.write("\rProcessed {} jets. Time elapsed: {:.1f}s".format(processed_jets, time.time()-start_time))
                     sys.stdout.flush()
 
         if processed_jets>=maxentries: break
@@ -520,27 +539,23 @@ def main(argv):
     sys.stdout.write("\rFinished processing. Total jets used from sample: {}".format(processed_jets))
     sys.stdout.flush()
     print("\nCreating plots")
-        
+
     canv1 = TCanvas("c1", "c1", 800, 600)
 
     plot_hist(canv1, [hist_frac_trk_b, hist_frac_trk_c, hist_frac_trk_btoc], ["bH", "prompt cH", "bH->cH"], False, base_filename+"_frac_trk.png", "", True)
     plot_hist(canv1, [hist_no_char_b, hist_no_char_c, hist_no_char_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_char.png", "", True)
     plot_hist(canv1, [hist_no_trk_b, hist_no_trk_c, hist_no_trk_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_no_trk.png", "", True)
     plot_hist(canv1, [hist_no_trk_jet_b, hist_no_trk_jet_c, hist_no_trk_jet_btoc, hist_no_trk_jet_o, hist_no_trk_jet_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_no_trk_jet.png", "", True)
+    plot_hist(canv1, [hist_fl_len_b, hist_fl_len_c, hist_fl_len_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_fl_len.png", "", True)
+    plot_hist(canv1, [hist_trk_vtx_dist_b, hist_trk_vtx_dist_c, hist_trk_vtx_dist_btoc], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_vtx_dist.png", "", True)
     plot_hist(canv1, [hist_trk_pt_b, hist_trk_pt_c, hist_trk_pt_btoc, hist_trk_pt_o, hist_trk_pt_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_pt.png", "HIST", True)
     plot_hist(canv1, [hist_trk_eta_b, hist_trk_eta_c, hist_trk_eta_btoc, hist_trk_eta_o, hist_trk_eta_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_eta.png", "HIST", True)
     plot_hist(canv1, [hist_trk_phi_b, hist_trk_phi_c, hist_trk_phi_btoc, hist_trk_phi_o, hist_trk_phi_nm], ["bH", "prompt cH", "bH->cH", "other", "no match"], True, base_filename+"_trk_phi.png", "HIST", True)
     plot_hist(canv1, [hist_no_trk_acc, hist_no_trk_rej], ["after cuts", "before cuts"], False, base_filename+"_no_trk_cuts.png", "", True)
-    plot_hist(canv1, [hist_trk_pv_d0_acc, hist_trk_o_d0_acc, hist_trk_nm_d0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_acc.png", "HIST", True)
-    plot_hist(canv1, [hist_trk_pv_z0_acc, hist_trk_o_z0_acc, hist_trk_nm_z0_acc], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_acc.png", "HIST", True)
-    plot_hist(canv1, [hist_trk_pv_d0_rej, hist_trk_o_d0_rej, hist_trk_nm_d0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_d0_rej.png", "HIST", True)
-    plot_hist(canv1, [hist_trk_pv_z0_rej, hist_trk_o_z0_rej, hist_trk_nm_z0_rej], ["pv associated", "non pv associated", "no match"], True, base_filename+"_trk_z0_rej.png", "HIST", True)
-
-    gPad.SetLogy()
-    hist_fl_len_btoc.Draw()
-    canv1.SaveAs(base_filename+"_fl_len_btoc.png")
-    gPad.Clear()
-    canv1.Clear()
+    plot_hist(canv1, [hist_trk_pv_d0_acc, hist_trk_o_d0_acc, hist_trk_nm_d0_acc], ["truth PV associated", "not truth PV associated", "no match"], True, base_filename+"_trk_d0_acc.png", "HIST", False)
+    plot_hist(canv1, [hist_trk_pv_z0_acc, hist_trk_o_z0_acc, hist_trk_nm_z0_acc], ["truth PV associated", "not truth PV associated", "no match"], True, base_filename+"_trk_z0_acc.png", "HIST", False)
+    plot_hist(canv1, [hist_trk_pv_d0_rej, hist_trk_o_d0_rej, hist_trk_nm_d0_rej], ["truth PV associated", "not truth PV associated", "no match"], True, base_filename+"_trk_d0_rej.png", "HIST", False)
+    plot_hist(canv1, [hist_trk_pv_z0_rej, hist_trk_o_z0_rej, hist_trk_nm_z0_rej], ["truth PV associated", "not truth PV associated", "no match"], True, base_filename+"_trk_z0_rej.png", "HIST", False)
 
 
 if __name__ == '__main__':

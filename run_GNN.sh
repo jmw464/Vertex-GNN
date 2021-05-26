@@ -1,17 +1,17 @@
 #!/bin/bash
 
-RUN=2
+RUN=0
 NTUPLE=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/raw/user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007.root
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
 DATA=btag_07_19_cut_x
 
-EPOCHS=25
+EPOCHS=1
 LR=0.001
-ENTRIES=100000000
+ENTRIES=10000
 
-NORMED=true
-BADJETS=true
+NORMED=1
+BADJETS=0
 
 PROCESS=false
 TRAIN=false
@@ -45,7 +45,7 @@ then
 	python scripts/create_graphs.py -d $DATADIR -s $DATA
 	printf "\n"
 	
-	if $NORMED
+	if [[ $NORMED != 0 ]]
 	then
 		printf "Running norm_graphs.py to normalize graphs based on training dataset\n"
 		python scripts/norm_graphs.py -d $DATADIR -s $DATA

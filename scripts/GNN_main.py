@@ -95,7 +95,7 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
-    parser.add_argument("-n", "--normed", type=bool, default=True, dest="use_normed", help="choose whether to use normalized features or not")
+    parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
     args = parser.parse_args()
 
     runnumber = args.runnumber
