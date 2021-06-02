@@ -4,16 +4,16 @@ RUN=0
 NTUPLE=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/raw/user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007.root
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATA=btag_07_19_cut_x
+DATA=btag_07_19_cut_trash
 
-EPOCHS=1
+EPOCHS=30
 LR=0.001
-ENTRIES=10000
+ENTRIES=100000
 
 NORMED=1
-BADJETS=0
+BADJETS=1
 
-PROCESS=false
+PROCESS=true
 TRAIN=false
 PLOT=true
 
@@ -62,5 +62,5 @@ fi
 if $PLOT
 then
 	printf "##########BEGINNING PLOTTING##########\n"
-	python scripts/truth.py -r $RUN -e $ENTRIES -d $DATA -o $OUTPUTDIR -n $NTUPLE -b $BADJETS
+	python scripts/generate_plots.py -r $RUN -e $ENTRIES -d $DATA -o $OUTPUTDIR -n $NTUPLE -b $BADJETS
 fi

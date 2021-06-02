@@ -21,9 +21,6 @@ nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 valp = 0.2 #fraction of data used for validation
 testp = 0.1 #fraction of data used for testing
 
-#script options
-reco_mode = 'b' #pv, sv or b (reconstruct only primary vertices, only secondary vertices or both)
-
 ###########################################################################################################
 
 
@@ -89,7 +86,7 @@ def main(argv):
         node_features = np.zeros((ntracks,nnfeatures))
         node_info = np.zeros((ntracks, 2)) #store event info
         edge_features = np.zeros((nedges,nefeatures))
-        vertex_positions = np.zeros((ntracks,3))
+        ancestors = np.zeros((ntracks,1))
         truth_labels = np.zeros((nedges,1))
         
         #read in features
@@ -106,37 +103,25 @@ def main(argv):
             jet_eta = infile['jfeatures']['eta'][ientry]
             jet_phi = infile['jfeatures']['phi'][ientry]
 
-            track_vx = infile['labels']['track_vx'][track_offset+j]
-            track_vy = infile['labels']['track_vy'][track_offset+j]
-            track_vz = infile['labels']['track_vz'][track_offset+j]
+            ancestors[j] = infile['labels']['ancestor'][track_offset+j]
+            flavor = infile['labels']['flavor'][track_offset+j]
             node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
             node_info[j] = [current_event, current_jet]
-            vertex_positions[j] = [track_vx, track_vy, track_vz]
-        
+
         track_offset += ntracks
 
         #calculate edge features and truth labels
         counter = 0
         for j in range(ntracks):
 
-            #set PV condition on truth labels
-            pv_distance = np.linalg.norm(vertex_positions[j]-primary_vertex)
-            if reco_mode == 'pv':
-                pv_condition = (pv_distance < 1e-4)
-            elif reco_mode == 'sv':
-                pv_condition = (pv_distance > 1e-4)
-            else:
-                pv_condition = True
-
             for k in range(j+1, ntracks):
                 
-                #edge features
+                #edge features - NOT CURRENTLY USED
                 delta_pt = abs(node_features[j][0] - node_features[k][0])
                 edge_features[counter:counter+2] = [delta_pt]
                    
-                #truth labels - vertices have to be close, real (not -999) and fulfill PV condition
-                distance = np.linalg.norm(vertex_positions[j]-vertex_positions[k])
-                if (distance < 1e-4) and pv_condition and vertex_positions[j][0] > -900.:
+                #truth labels - vertices have to share the same HF ancestor
+                if ancestors[k] == ancestors[j] and ancestors[k] > 0:
                     truth_labels[counter:counter+2] = 1
                 else:
                     truth_labels[counter:counter+2] = 0
@@ -158,6 +143,8 @@ def main(argv):
         #output progress
         sys.stdout.write("\rProcessed {}% of jets".format(round(ngraphs*100/total_jets)))
         sys.stdout.flush()
+
+    print("\nPercentage of \"True\" labels: {}%".format(total_ones*100/total_edges))
 
     #calculate size of testing, training and validation set
     test_len = int(round(testp*ngraphs))
@@ -185,7 +172,7 @@ def main(argv):
     paramfile.close()
 
     p_time = time.time()-start_time
-    print("\nFinished creating graphs. Time elapsed: {}s.".format(p_time))
+    print("Finished creating graphs. Time elapsed: {}s.".format(p_time))
 
 
 if __name__ == '__main__':

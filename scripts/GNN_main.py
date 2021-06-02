@@ -27,13 +27,13 @@ np.set_printoptions(threshold=sys.maxsize)
 batch_size = 10000 #number of jets in a single training batch
 
 #model parameters
-attention_heads = 2 #number of attention heads in GAT layer -> these are averaged over
+attention_heads = 1 #number of attention heads in GAT layer -> these are averaged over
 gnn_hidfeats = 256 #number of hidden features in GAT layer output
-mlp_hidfeats = 512 #number of hidden features in MLP layers (actual number is twice this since two node feature sets are concatenated)
 
 #script options
-reweight = False #reweight positive labels in loss to make positives and negatives equally important
+reweight = True #reweight positive labels in loss to make positives and negatives equally important
 load_checkpoint = False
+use_lr_scheduler = True
 
 ###########################################################################################################
 
@@ -152,8 +152,9 @@ def main(argv):
 
     device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
     
-    model = EdgePredModel(nnfeatures, gnn_hidfeats, mlp_hidfeats, attention_heads).double().to(device)
+    model = EdgePredModel(nnfeatures, gnn_hidfeats, attention_heads).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
+    if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.01, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
     loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
     sig = nn.Sigmoid() #since loss already has sigmoid function built in, we need to pass model outputs through a separate sigmoid function for evaluation
 
@@ -194,7 +195,7 @@ def main(argv):
             else:
                 iend = (ibatch+1)*batch_size
             batch = dgl.batch(dgl.load_graphs(train_infile_name, list(range(istart, iend)))[0])
-            
+
             #process batch
             batch = batch.to(device) #transfer batch to relevant device
             pred = model(batch, batch.ndata['features'])
@@ -209,6 +210,8 @@ def main(argv):
             print("Training loss: {}".format(pred_lt.item()/batch_labels))
             train_loss_array[epoch-1] += pred_lt.item()
 
+            if use_lr_scheduler: scheduler.step()
+        
         #normalize loss
         train_loss_array[epoch-1] = train_loss_array[epoch-1]/total_labels
 
