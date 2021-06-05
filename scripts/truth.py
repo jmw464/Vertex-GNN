@@ -18,6 +18,10 @@ class truth_particle():
         self.parents = parents
         self.children = children
 
+    def print_particle(self,level):
+        prefix = "--"*level + ">"
+        print("{} PDG ID: {}, Barcode: {}, Parents: {}, Children: {}, PV: {}, DV: {}".format(prefix, self.pdgid, self.barcode, self.parents, self.children, self.pv, self.dv))
+
 
 class truth_track():
     def __init__(self, barcode, pdgid, vertex, pt, eta, phi, z0):
@@ -28,9 +32,13 @@ class truth_track():
         self.eta = eta
         self.phi = phi
         self.z0 = z0
-        self.hf_ancestor = 0 #overall HF ancestor (always corresponds to b hadron for bH->cH tracks)
-        self.btoc_ancestor = 0 #direct charm ancestor for bH->cH tracks from charm hadrons
+        self.hf_ancestor = 0 #direct HF ancestor
+        self.btoc_ancestor = 0 #bH ancestor for bH->cH tracks from charm hadrons
         self.classification = ""
+
+    def print_track(self,level):
+        prefix = "xx"*level + ">"
+        print("{} PDG ID: {}, Barcode: {}, Vertex: {}".format(prefix, self.pdgid, self.barcode, self.vertex))
 
 
 def build_particle_dict(entry):
@@ -153,42 +161,50 @@ def get_hf_relatives(particle, particle_dict, particle_list, mode, skip): #skip 
     return particle_list
 
 
-def classify_track(index, particle_dict, track_dict, threshold_dist, bc_threshold_dist):
+def classify_track(index, particle_dict, track_dict):
     barcode = track_dict[index].barcode
     hf_barcode = track_dict[index].hf_ancestor
     track_vertex = track_dict[index].vertex
     if hf_barcode > 0: primary_distance = np.linalg.norm(track_vertex-particle_dict[hf_barcode].dv)
 
     min_distance = -1
-    second_ancestor = 0
     if barcode < -990:
         return 'nm' #no truth particle match
-    elif hf_barcode > 0 and id_particle(particle_dict[hf_barcode].pdgid) == 'ch' and primary_distance <= threshold_dist:
-        ch_barcodes = get_hf_relatives(particle_dict[hf_barcode], particle_dict, np.array([]), 'a', 1)
-        for ch_barcode in ch_barcodes:
-            distance = np.linalg.norm(particle_dict[hf_barcode].pv - particle_dict[ch_barcode].dv)
-            if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[ch_barcode].pdgid) == 'bh':
+    elif barcode >= 200000:
+        return 's' #secondary interaction
+    elif hf_barcode > 0 and id_particle(particle_dict[hf_barcode].pdgid) == 'ch':
+        bh_barcodes = get_hf_relatives(particle_dict[hf_barcode], particle_dict, np.array([]), 'a', 1)
+        for bh_barcode in bh_barcodes:
+            distance = np.linalg.norm(particle_dict[hf_barcode].pv - particle_dict[bh_barcode].dv)
+            if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[bh_barcode].pdgid) == 'bh':
                 min_distance = distance
-                second_ancestor = ch_barcode
-        if second_ancestor > 0 and min_distance <= bc_threshold_dist:
-            track_dict[index].btoc_ancestor = track_dict[index].hf_ancestor
-            track_dict[index].hf_ancestor = second_ancestor
+                track_dict[index].btoc_ancestor = bh_barcode
+        if track_dict[index].btoc_ancestor > 0:
             return 'btoc'
         else:
             return 'c'
-    elif hf_barcode > 0 and id_particle(particle_dict[hf_barcode].pdgid) == 'bh' and primary_distance <= threshold_dist:
-        #bh_barcodes = get_hf_relatives(particle_dict[hf_barcode], particle_dict, np.array([]), 'd', 1)
-        #for bh_barcode in bh_barcodes:
-        #    distance = np.linalg.norm(particle_dict[hf_barcode].dv - particle_dict[bh_barcode].pv)
-        #    if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[bh_barcode].pdgid) == 'ch':
-        #        min_distance = distance
-        #        second_ancestor = bh_barcode
-        #if second_ancestor != -1 and min_distance <= bc_threshold_dist:
-        #    return 'btoc'
-        #else:
+    elif hf_barcode > 0 and id_particle(particle_dict[hf_barcode].pdgid) == 'bh':
         return 'b'
     else:
         return 'o'
+
+
+def print_tree(particle, particle_dict, track_dict, level):
+    barcode = particle.barcode
+    pdgid = particle.pdgid
+    condition = True #eg pdgid != 21 and pdgid != 22 OR (id_particle(pdgid) == 'ch') or (id_particle(pdgid) == 'bh')
+
+    #print information
+    if condition:
+        for ti in track_dict:
+            if barcode == track_dict[ti].barcode:
+                track_dict[ti].print_track(level)
+        particle.print_particle(level)
+
+    #loop through children recursively
+    if level:
+        for child in particle.children:
+            print_tree(particle_dict[child], particle_dict, track_dict, level+1)
 
 
 #implement cuts on jet level

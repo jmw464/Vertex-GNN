@@ -18,10 +18,6 @@ track_pt_cut = 650 #600 MeV
 track_eta_cut = 2.5 #edge of detector
 track_z0_cut = 20
 
-#set thresholds for track classification
-threshold_dist = 5 #maximum distance between HF vertex and track vertex
-bc_threshold_dist = 5 #maximum distance between b decay vertex and c production vertex for bH->cH tracks
-
 ###########################################################################################################
 
 #plot list of histograms with specified labels
@@ -47,7 +43,7 @@ def plot_hist(canv, histlist, labellist, norm, filename, options, overflow):
     canv.SaveAs(filename)
     gPad.Clear()
     canv.Clear()
-        
+
 
 def main(argv):
     gROOT.SetBatch(True)
@@ -77,13 +73,13 @@ def main(argv):
     hist_no_char_c = TH1D("no_char_c", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
     hist_no_char_btoc = TH1D("no_char_btoc", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
     
-    hist_fl_len_b = TH1D("fl_len_b", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 10)
-    hist_fl_len_c = TH1D("fl_len_c", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 10)
-    hist_fl_len_btoc = TH1D("fl_len_btoc", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 10)
+    hist_fl_len_b = TH1D("fl_len_b", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 1)
+    hist_fl_len_c = TH1D("fl_len_c", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 1)
+    hist_fl_len_btoc = TH1D("fl_len_btoc", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 1)
 
-    hist_trk_vtx_dist_b = TH1D("trk_vtx_dist_b", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 10)
-    hist_trk_vtx_dist_c = TH1D("trk_vtx_dist_c", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 10)
-    hist_trk_vtx_dist_btoc = TH1D("trk_vtx_dist_btoc", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 10)
+    hist_trk_vtx_dist_b = TH1D("trk_vtx_dist_b", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 1)
+    hist_trk_vtx_dist_c = TH1D("trk_vtx_dist_c", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 1)
+    hist_trk_vtx_dist_btoc = TH1D("trk_vtx_dist_btoc", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 1)
 
     hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
     hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
@@ -203,18 +199,13 @@ def main(argv):
                     ch_parent_list = np.array([])
                     btoc_parent_list = np.array([])
                     
-                    #make first attempt at track classification (still need to correct some bH labels to bH->cH after this point)
+                    #classify tracks
                     for ti in track_dict:
-                        t_class = classify_track(ti, particle_dict, track_dict, threshold_dist, bc_threshold_dist)
+                        t_class = classify_track(ti, particle_dict, track_dict)
                         track_dict[ti].classification = t_class
-                        if t_class == 'btoc':
-                            btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
 
-                    #fix classifications and fill histograms
+                    #fill histograms
                     for ti in track_dict:
-                        if track_dict[ti].classification == 'b' and track_dict[ti].hf_ancestor in btoc_parent_list:
-                            track_dict[ti].classification = 'btoc'
-                            btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
  
                         t_class = track_dict[ti].classification
                         parent = track_dict[ti].hf_ancestor
@@ -246,7 +237,7 @@ def main(argv):
                             hist_trk_eta_btoc.Fill(track_dict[ti].eta)
                             hist_trk_phi_btoc.Fill(track_dict[ti].phi)
                             hist_trk_z0_btoc.Fill(track_dict[ti].z0)
-                            cH_parent = track_dict[ti].btoc_ancestor
+                            btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
                             hist_fl_len_btoc.Fill(np.linalg.norm(particle_dict[parent].dv-track_dict[ti].vertex))
                         else:
                             jet_trk_o += 1

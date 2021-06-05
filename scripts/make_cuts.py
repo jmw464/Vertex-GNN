@@ -20,9 +20,7 @@ track_pt_cut = 650 #650 MeV
 track_eta_cut = 2.5 #edge of detector
 track_z0_cut = 20
 
-vertex_threshold = 0
-threshold_dist = 5
-bc_threshold_dist = 5
+vertex_threshold = 0 #threshold for non HF tracks to be marked as part of the same vertex
 
 ###########################################################################################################
 
@@ -73,6 +71,7 @@ def main(argv):
     labels = dict()
     labels['ancestor'] = []
     labels['flavor'] = []
+    labels['second_ancestor'] = [] #only gets determined for B->C tracks
 
     total_rem_tracks = 0
     total_tracks = 0
@@ -111,6 +110,7 @@ def main(argv):
             t_z0 = []
             t_q = []
             t_ancestor = []
+            t_second_ancestor = []
             t_flavor = []
 
             total_jets += 1
@@ -143,7 +143,7 @@ def main(argv):
 
                 #make first attempt at track classification (still need to correct some bH labels to bH->cH after this point)
                 for ti in track_dict:
-                    t_class = classify_track(ti, particle_dict, track_dict, threshold_dist, bc_threshold_dist)
+                    t_class = classify_track(ti, particle_dict, track_dict)
                     track_dict[ti].classification = t_class
                     if t_class == 'btoc':
                         btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
@@ -180,7 +180,8 @@ def main(argv):
                     else:
                         t_flavor.append(0)
                     t_ancestor.append(track_dict[ti].hf_ancestor)
-    
+                    t_second_ancestor.append(track_dict[ti].btoc_ancestor)
+
                 #write events
                 jfeatures['pt'].append(entry.jet_pt[i])
                 jfeatures['eta'].append(entry.jet_eta[i])
@@ -195,6 +196,7 @@ def main(argv):
                 tfeatures['q'].extend(t_q)
 
                 labels['ancestor'].extend(t_ancestor)
+                labels['second_ancestor'].extend(t_second_ancestor)
                 labels['flavor'].extend(t_flavor)
 
                 info['event'].append(ientry)

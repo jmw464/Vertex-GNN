@@ -21,6 +21,10 @@ nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 valp = 0.2 #fraction of data used for validation
 testp = 0.1 #fraction of data used for testing
 
+#matching parameters
+incl_btoc = 1 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
+incl_secondary = 0 #toggle whether to include tracks from secondary processes in SV's based on their HF ancestors
+
 ###########################################################################################################
 
 
@@ -87,6 +91,8 @@ def main(argv):
         node_info = np.zeros((ntracks, 2)) #store event info
         edge_features = np.zeros((nedges,nefeatures))
         ancestors = np.zeros((ntracks,1))
+        second_ancestors = np.zeros((ntracks,1))
+        flavors = np.zeros((ntracks,1))
         truth_labels = np.zeros((nedges,1))
         
         #read in features
@@ -104,7 +110,8 @@ def main(argv):
             jet_phi = infile['jfeatures']['phi'][ientry]
 
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
-            flavor = infile['labels']['flavor'][track_offset+j]
+            second_ancestors[j] = infile['labels']['ancestor'][track_offset+j]
+            flavors[j] = infile['labels']['flavor'][track_offset+j]
             node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
             node_info[j] = [current_event, current_jet]
 
@@ -119,10 +126,16 @@ def main(argv):
                 #edge features - NOT CURRENTLY USED
                 delta_pt = abs(node_features[j][0] - node_features[k][0])
                 edge_features[counter:counter+2] = [delta_pt]
-                   
+
                 #truth labels - vertices have to share the same HF ancestor
-                if ancestors[k] == ancestors[j] and ancestors[k] > 0:
+                if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] != 0 and flavors[k] != 0: #matching direct ancestors for non secondaries (B to B or C to C)
                     truth_labels[counter:counter+2] = 1
+                elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C)
+                    truth_labels[counter:counter+2] = incl_btoc
+                elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or second_ancestors[j] == ancestors[k]: #matching second ancestor and direct ancestor (B to B->C)
+                    truth_labels[counter:counter+2] = incl_btoc
+                elif ancestors[k] == ancestors[j]: #matching direct ancestors for secondaries (B to S, C to S or S to S)
+                    truth_labels[counter:counter+2] = incl_secondary
                 else:
                     truth_labels[counter:counter+2] = 0
                     

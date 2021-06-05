@@ -1,20 +1,20 @@
 #!/bin/bash
 
-RUN=0
+RUN=3
 NTUPLE=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/raw/user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007.root
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATA=btag_07_19_cut_trash
+DATA=btag_07_19_cut_v2s
 
 EPOCHS=30
 LR=0.001
-ENTRIES=100000
+ENTRIES=10000
 
 NORMED=1
 BADJETS=1
 
-PROCESS=true
-TRAIN=false
+PROCESS=false
+TRAIN=true
 PLOT=true
 
 #create output directory if not already there

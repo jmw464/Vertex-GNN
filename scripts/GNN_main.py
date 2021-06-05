@@ -33,7 +33,7 @@ gnn_hidfeats = 256 #number of hidden features in GAT layer output
 #script options
 reweight = True #reweight positive labels in loss to make positives and negatives equally important
 load_checkpoint = False
-use_lr_scheduler = True
+use_lr_scheduler = False
 
 ###########################################################################################################
 
@@ -154,7 +154,7 @@ def main(argv):
     
     model = EdgePredModel(nnfeatures, gnn_hidfeats, attention_heads).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
-    if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.01, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
+    if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
     loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
     sig = nn.Sigmoid() #since loss already has sigmoid function built in, we need to pass model outputs through a separate sigmoid function for evaluation
 
