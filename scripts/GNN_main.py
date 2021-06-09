@@ -51,15 +51,18 @@ def evaluate_results(true, pred):
 
 #print list of jets GNN performs poorly on and plot overall results
 def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
-    event_list = node_info[:,0]
-    jet_list = node_info[:,1]
+    file_list = node_info[:,0]
+    event_list = node_info[:,1]
+    jet_list = node_info[:,2]
+    bad_events = np.empty((0,3), dtype=np.int)
 
     eindex_begin = eindex_end = ntracks = 0
+    current_file = file_list[0]
     current_event = event_list[0]
     current_jet = jet_list[0]
     total_bad = total = 0
     for i in range(len(event_list)+1): #+1 is there to ensure the last jet gets checked as well
-        if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i]:
+        if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i] or current_file != file_list[i]:
             eindex_begin = eindex_end
             eindex_end += ntracks*(ntracks-1)
             ntracks = 1
@@ -69,16 +72,24 @@ def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
             if (tp+fn != 0): tpr_hist.Fill(tp/(tp+fn))
             if (tn+fp != 0): tnr_hist.Fill(tn/(tn+fp))
             if (tp+fn != 0 and tp/(tp+fn) < 0.7) or (tn+fp != 0 and tn/(tn+fp) < 0.5):
-                outfile.write(str(int(current_event))+' '+str(int(current_jet))+'\n')
+                bad_events = np.append(bad_events, [[current_file, current_event, current_jet]], axis=0)
                 total_bad += 1
             total += 1
         else:
             ntracks += 1
 
         if i != len(event_list):
+            current_file = file_list[i]
             current_event = event_list[i]
             current_jet = jet_list[i]
+
+    #sort array with bad events by file, event and jet
+    indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
+    bad_events = bad_events[indices]
     
+    for i in range(np.shape(bad_events)[0]):
+        outfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
+
     print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total, total))
 
     return tpr_hist, tnr_hist

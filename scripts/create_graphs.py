@@ -17,10 +17,6 @@ import time
 nnfeatures = 10 #number of features per node
 nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 
-#output data parameters
-valp = 0.2 #fraction of data used for validation
-testp = 0.1 #fraction of data used for testing
-
 #matching parameters
 incl_btoc = 1 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
 incl_secondary = 0 #toggle whether to include tracks from secondary processes in SV's based on their HF ancestors
@@ -59,10 +55,7 @@ def main(argv):
 
     #file names
     infile_name = data_path+data_name+".hdf5"
-    paramfile_name = data_path+data_name+"_params"
-    train_outfile_name = data_path+data_name+"_train.bin"
-    val_outfile_name = data_path+data_name+"_val.bin"
-    test_outfile_name = data_path+data_name+"_test.bin"
+    outfile_name = data_path+data_name+".bin"
 
     start_time = time.time()
     infile = h5py.File(infile_name, "r")
@@ -70,8 +63,7 @@ def main(argv):
 
     total_jets = len(infile['info']['event'])
     track_offset = 0 #tracks are stored in continuous chunk -> need to offset indices for each jet
-    total_ones = 0
-    total_edges = 0
+    total_ones = total_edges = 0
     ngraphs = 0
     event_index = previous_event = -1
     for ientry in range(total_jets):
@@ -88,7 +80,7 @@ def main(argv):
 
         #initialize empty arrays
         node_features = np.zeros((ntracks,nnfeatures))
-        node_info = np.zeros((ntracks, 2)) #store event info
+        node_info = np.zeros((ntracks, 3)) #store event info - file (set in combine_graphs.py), event, jet
         edge_features = np.zeros((nedges,nefeatures))
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
@@ -110,10 +102,10 @@ def main(argv):
             jet_phi = infile['jfeatures']['phi'][ientry]
 
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
-            second_ancestors[j] = infile['labels']['ancestor'][track_offset+j]
+            second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
             node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
-            node_info[j] = [current_event, current_jet]
+            node_info[j] = [0, current_event, current_jet]
 
         track_offset += ntracks
 
@@ -132,13 +124,15 @@ def main(argv):
                     truth_labels[counter:counter+2] = 1
                 elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C)
                     truth_labels[counter:counter+2] = incl_btoc
-                elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or second_ancestors[j] == ancestors[k]: #matching second ancestor and direct ancestor (B to B->C)
+                elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or (second_ancestors[j] == ancestors[k] and ancestors[k] > 0): #matching second ancestor and direct ancestor (B to B->C)
                     truth_labels[counter:counter+2] = incl_btoc
-                elif ancestors[k] == ancestors[j]: #matching direct ancestors for secondaries (B to S, C to S or S to S)
+                elif ancestors[k] == ancestors[j] and ancestors[k] < 0: #matching direct ancestors for secondaries (B to S, C to S or S to S)
                     truth_labels[counter:counter+2] = incl_secondary
                 else:
                     truth_labels[counter:counter+2] = 0
-                    
+
+                ####print(ancestors[j], flavors[j], ancestors[k], flavors[k], truth_labels[counter])
+
                 counter += 2
        
         total_ones += np.sum(truth_labels)
@@ -159,30 +153,8 @@ def main(argv):
 
     print("\nPercentage of \"True\" labels: {}%".format(total_ones*100/total_edges))
 
-    #calculate size of testing, training and validation set
-    test_len = int(round(testp*ngraphs))
-    val_len = int(round(valp*ngraphs))
-    train_len = int(ngraphs - (test_len + val_len))
-
-    #split g_list
-    test_list = g_list[:test_len]
-    val_list = g_list[test_len:test_len+val_len]
-    train_list = g_list[test_len+val_len:]
-
     #save graphs to file
-    dgl.save_graphs(test_outfile_name, test_list)
-    dgl.save_graphs(val_outfile_name, val_list)
-    dgl.save_graphs(train_outfile_name, train_list)
-    infile.close()
-
-    #store important values in paramfile
-    paramfile = open(paramfile_name, "w")
-    paramfile.write(str(test_len)+'\n')
-    paramfile.write(str(val_len)+'\n')
-    paramfile.write(str(train_len)+'\n')
-    truth_frac = total_ones/total_edges
-    paramfile.write(str(truth_frac)+'\n')
-    paramfile.close()
+    dgl.save_graphs(outfile_name, g_list)
 
     p_time = time.time()-start_time
     print("Finished creating graphs. Time elapsed: {}s.".format(p_time))

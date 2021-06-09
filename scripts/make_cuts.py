@@ -138,16 +138,13 @@ def main(argv):
                         t_q.append(entry.jet_trk_charge[i][j])
 
                 track_dict, jet_cut_trk = build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut)
-                btoc_parent_list = np.array([])
                 um_other_tracks = np.array([])
 
                 #make first attempt at track classification (still need to correct some bH labels to bH->cH after this point)
                 for ti in track_dict:
                     t_class = classify_track(ti, particle_dict, track_dict)
                     track_dict[ti].classification = t_class
-                    if t_class == 'btoc':
-                        btoc_parent_list = np.append(btoc_parent_list, track_dict[ti].hf_ancestor)
-                    elif t_class == 'o':
+                    if t_class == 'o':
                         um_other_tracks = np.append(um_other_tracks, ti)
                 
                 #give tracks not associated with HF hadrons unique ancestor barcodes to group them (<0 for vertices not originating from HF hadrons)
@@ -168,8 +165,6 @@ def main(argv):
 
                 #fix classifications and save relevant label data
                 for ti in track_dict:
-                    if track_dict[ti].classification == 'b' and track_dict[ti].hf_ancestor in btoc_parent_list:
-                        track_dict[ti].classification = 'btoc'
                     flavor = track_dict[ti].classification
                     if flavor == 'b':
                         t_flavor.append(1)
