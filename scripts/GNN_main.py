@@ -28,39 +28,66 @@ batch_size = 10000 #number of jets in a single training batch
 
 #model parameters
 attention_heads = 1 #number of attention heads in GAT layer -> these are averaged over
-gnn_hidfeats = 256 #number of hidden features in GAT layer output
+in_features = 10 #number of unique features per node
+nodemlp_sizes = [in_features, 20]
+gat_sizes = [in_features, 128, 256]
+edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128] #excluding output features
 
 #script options
 reweight = True #reweight positive labels in loss to make positives and negatives equally important
 load_checkpoint = False
 use_lr_scheduler = False
+multi_class = True
+
+#bad jet criteria for each category
+mult_threshold = [0.7, 0.7, 0.7, 0.7, 0.7] #0, 1, 2, 3, 4
+bin_threshold = [0.5, 0.7] #False, True
 
 ###########################################################################################################
 
 
-#evaluate tp, tn, fp, fn for GNN results
-def evaluate_results(true, pred):
+#evaluate confusion matrix for binary case
+def evaluate_confusion_bin(true, pred):
 
-    tp = np.sum((true == 1) & (pred == 1)) #actually true, marked as true
-    tn = np.sum((true == 0) & (pred == 0)) #actually false, marked as false
-    fp = np.sum((true == 0) & (pred == 1)) #actually false, marked as true
-    fn = np.sum((true == 1) & (pred == 0)) #actually true, marked as false
+    cm = np.zeros((2,2),dtype=int)
+    cm[1,1] = np.sum((true[:,0] == 1) & (pred[:,0] == 1)) #true positive - actually true, marked as true
+    cm[0,0] = np.sum((true[:,0] == 0) & (pred[:,0] == 0)) #true negative - actually false, marked as false
+    cm[0,1] = np.sum((true[:,0] == 0) & (pred[:,0] == 1)) #false positive - actually false, marked as true
+    cm[1,0] = np.sum((true[:,0] == 1) & (pred[:,0] == 0)) #false negative - actually true, marked as false
     
-    return tp, tn, fp, fn
+    return cm
 
 
-#print list of jets GNN performs poorly on and plot overall results
-def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
+#evaluate confusion matrix for multi-class case
+def evaluate_confusion_mult(true, pred):
+
+    cm = np.zeros((5,5),dtype=int)
+    for i in range(5):
+        for j in range(5):
+            cm[i,j] = np.sum((true[:,0] == i) & (pred[:] == j))
+    
+    return cm
+
+
+#print results, list of events GNN performs poorly on and make TPR/TNR plots for binary classification
+def evaluate_results(pred, true, node_info, outfile, hist_list, multi_class):
     file_list = node_info[:,0]
     event_list = node_info[:,1]
     jet_list = node_info[:,2]
     bad_events = np.empty((0,3), dtype=np.int)
+
+    #store recall for each class
+    if not multi_class:
+        r_array = np.zeros(2)
+    else:
+        r_array = np.zeros(5)
 
     eindex_begin = eindex_end = ntracks = 0
     current_file = file_list[0]
     current_event = event_list[0]
     current_jet = jet_list[0]
     total_bad = total = 0
+
     for i in range(len(event_list)+1): #+1 is there to ensure the last jet gets checked as well
         if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i] or current_file != file_list[i]:
             eindex_begin = eindex_end
@@ -68,13 +95,30 @@ def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
             ntracks = 1
             rel_pred = pred[eindex_begin:eindex_end]
             rel_true = true[eindex_begin:eindex_end]
-            tp, tn, fp, fn = evaluate_results(rel_true, rel_pred)
-            if (tp+fn != 0): tpr_hist.Fill(tp/(tp+fn))
-            if (tn+fp != 0): tnr_hist.Fill(tn/(tn+fp))
-            if (tp+fn != 0 and tp/(tp+fn) < 0.7) or (tn+fp != 0 and tn/(tn+fp) < 0.5):
-                bad_events = np.append(bad_events, [[current_file, current_event, current_jet]], axis=0)
-                total_bad += 1
+
+            if not multi_class:
+                cm = evaluate_confusion_bin(rel_true, rel_pred)
+                r_threshold = bin_threshold
+            else:
+                cm = evaluate_confusion_mult(rel_true, rel_pred)
+                r_threshold = mult_threshold
+            
+            #fill histograms and r_array to determine bad events
+            for j in range(cm.shape[0]):
+                if np.sum(cm[j,:]) != 0:
+                    r_array[j] = cm[j,j]/np.sum(cm[j,:])
+                    hist_list[j].Fill(r_array[j])
+                else:
+                    r_array[j] = -1
+
+            for j in range(cm.shape[0]):
+                if r_array[j] < r_threshold[j] and r_array[j] >= 0:
+                    bad_events = np.append(bad_events, [[current_file, current_event, current_jet]], axis=0)
+                    total_bad += 1
+                    break
+
             total += 1
+
         else:
             ntracks += 1
 
@@ -92,7 +136,7 @@ def evaluate_events(pred, true, node_info, outfile, tpr_hist, tnr_hist):
 
     print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total, total))
 
-    return tpr_hist, tnr_hist
+    return hist_list
 
 
 def main(argv):
@@ -142,6 +186,10 @@ def main(argv):
         val_len = int(paramfile.readline())
         train_len = int(paramfile.readline())
         truth_frac = float(paramfile.readline())
+        b_frac = float(paramfile.readline())
+        c_frac = float(paramfile.readline())
+        btoc_frac = float(paramfile.readline())
+        o_frac = float(paramfile.readline())
     else:
         print("ERROR: Specified parameter file not found")
         return 1
@@ -152,9 +200,11 @@ def main(argv):
     #reweight positive labels automatically if desired
     if reweight:
         pos_weight = th.tensor([(1-truth_frac)/truth_frac])
+        mult_weights = th.tensor([1/(1-b_frac-c_frac-btoc_frac-o_frac), 1/b_frac, 1/c_frac, 1/btoc_frac, 1/o_frac])
         print("Setting positive weight to {}".format(pos_weight))
     else:
         pos_weight = th.tensor([1])
+        mult_weights = th.tensor([1, 1, 1, 1, 1])
 
     #calculate number of testing, training and validation batches
     test_batches = int(math.ceil(test_len/batch_size))
@@ -162,13 +212,24 @@ def main(argv):
     train_batches = int(math.ceil(train_len/batch_size))
 
     device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
-    
-    model = EdgePredModel(nnfeatures, gnn_hidfeats, attention_heads).double().to(device)
+
+    if not multi_class:
+        loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
+        outfeats = 1
+        cm = np.zeros((2,2),dtype=int)
+        activation = nn.Sigmoid()
+        labeltype = 'bin_labels'
+    else:
+        loss = nn.CrossEntropyLoss(weight=mult_weights).double().to(device)
+        outfeats = 5
+        cm = np.zeros((5,5),dtype=int)
+        activation = nn.Softmax(dim=1)
+        labeltype = 'mult_labels'
+
+    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, outfeats, attention_heads).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
-    loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
-    sig = nn.Sigmoid() #since loss already has sigmoid function built in, we need to pass model outputs through a separate sigmoid function for evaluation
-
+        
     train_loss_array = np.zeros(nepochs)
     val_loss_array = np.zeros(nepochs)
 
@@ -210,13 +271,16 @@ def main(argv):
             #process batch
             batch = batch.to(device) #transfer batch to relevant device
             pred = model(batch, batch.ndata['features'])
-            pred_lt = loss(pred, batch.edata['labels'])
+            target = batch.edata[labeltype]
+            if multi_class: target = target[:,0].long()
+            pred_lt = loss(pred, target)
+
             opt.zero_grad()
             pred_lt.backward()
             opt.step()
 
             #evaluate loss
-            batch_labels = batch.edata['labels'].size()[0]
+            batch_labels = batch.edata['bin_labels'].size()[0]
             total_labels += batch_labels
             print("Training loss: {}".format(pred_lt.item()/batch_labels))
             train_loss_array[epoch-1] += pred_lt.item()
@@ -231,7 +295,7 @@ def main(argv):
 
         #validation
         total_labels = 0
-        tp = tn = fp = fn = 0
+
         model.eval()
         for ibatch in range(val_batches):
 
@@ -246,19 +310,12 @@ def main(argv):
             #process batch
             val_batch = val_batch.to(device)
             pred = model(val_batch, val_batch.ndata['features'])
-            pred_lv = loss(pred, val_batch.edata['labels'])
-
-            #evaluate results
-            pred = sig(pred.float()).cpu().detach().numpy().flatten().round().astype(int)
-            true = val_batch.edata['labels'].cpu().numpy().flatten().astype(int)
-            tpi, tni, fpi, fni = evaluate_results(true, pred)
-            tp += tpi
-            tn += tni
-            fp += fpi
-            fn += fni
+            target = val_batch.edata[labeltype]
+            if multi_class: target = target[:,0].long()
+            pred_lv = loss(pred, target)
 
             #evaluate loss
-            batch_labels = val_batch.edata['labels'].size()[0]
+            batch_labels = val_batch.edata['bin_labels'].size()[0]
             total_labels += batch_labels
             print("Validation loss: {}".format(pred_lv.item()/batch_labels))
             val_loss_array[epoch-1] += pred_lv.item()
@@ -268,16 +325,32 @@ def main(argv):
 
         #print validation results
         e_time = time.time()-start_time
-        print('Validation results: {} TP, {} FP, {} TN, {} FN. Time elapsed: {}s.\n'.format(tp, fp, tn, fn, e_time))
+        print('Time elapsed: {}s.\n'.format(e_time))
 
     print("Training finished. Evaluating model.\n")
     
     registerfile = open(registerfile_name, "w")
-    tpr_hist = TH1D("tpr_hist", "Results for each jet;Rate;Entries",10,0,1.001) #1.001 is the upper bound so this is inclusive of 1
-    tnr_hist = TH1D("tnr_hist", "Results for each jet;Rate;Entries",10,0,1.001)
+    if not multi_class:
+        pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Entries",10,0,1.001) #1.001 is the upper bound so this is inclusive of 1
+        neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Entries",10,0,1.001)
+        edge_score_hist = TH1D("", "Edges scores;Score;Entries",10,0,1.001)
+        hist_r_list = [neg_r_hist, pos_r_hist]
+        hist_s_list = [edge_score_hist]
+    else:
+        neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Entries",10,0,1.001)
+        b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Entries",10,0,1.001)
+        c_r_hist = TH1D("Class 2 recall", "Results for each jet;Rate;Entries",10,0,1.001)
+        btoc_r_hist = TH1D("Class 3 recall", "Results for each jet;Rate;Entries",10,0,1.001)
+        o_r_hist = TH1D("Class 4 recall", "Results for each jet;Rate;Entries",10,0,1.001)
+        neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Entries",10,0,1.001)
+        b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Entries",10,0,1.001)
+        c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Entries",10,0,1.001)
+        btoc_score_hist = TH1D("Class 3 scores", "Class scores;Score;Entries",10,0,1.001)
+        o_score_hist = TH1D("Class 4 scores", "Class scores;Score;Entries",10,0,1.001)
+        hist_r_list = [neg_r_hist, b_r_hist, c_r_hist, btoc_r_hist, o_r_hist]
+        hist_s_list = [neg_score_hist, b_score_hist, c_score_hist, btoc_score_hist, o_score_hist]
 
     #testing
-    tp = tn = fp = fn = 0
     model.eval()
     for ibatch in range(test_batches):
         
@@ -293,49 +366,84 @@ def main(argv):
         test_batch = test_batch.to(device)
         node_features = test_batch.ndata['features']
         node_info = test_batch.ndata['info'].cpu().numpy()
-        edge_labels = test_batch.edata['labels']
+        edge_labels = test_batch.edata[labeltype]
         
         #evaluate results
-        pred = sig(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy().flatten().round().astype(int)
-        true = test_batch.edata['labels'].cpu().numpy().flatten().astype(int)
-        tpr_hist, tnr_hist = evaluate_events(pred, true, node_info, registerfile, tpr_hist, tnr_hist) #output list of events with bad performance to use in truth.py and plot TPR/TNR
-        tpi, tni, fpi, fni = evaluate_results(true, pred)
-        tp += tpi
-        tn += tni
-        fp += fpi
-        fn += fni
+        pred = activation(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy()
+        
+        if not multi_class:
+            for i in range(pred.shape[0]):
+                edge_score_hist.Fill(pred[i,0])
+            pred = pred.round().astype(int)
+        else:
+            for i in range(pred.shape[0]):
+                neg_score_hist.Fill(pred[i,0])
+                b_score_hist.Fill(pred[i,1])
+                c_score_hist.Fill(pred[i,2])
+                btoc_score_hist.Fill(pred[i,3])
+                o_score_hist.Fill(pred[i,4])
+            pred = np.argmax(pred, axis=1)
+        
+        true = test_batch.edata[labeltype].cpu().numpy().astype(int)
+        hist_r_list = evaluate_results(pred, true, node_info, registerfile, hist_r_list, multi_class)
+
+        if not multi_class:
+            cm += evaluate_confusion_bin(true, pred)
+        else:
+            cm += evaluate_confusion_mult(true, pred)
 
     #print test results
-    print("Test results: {} TP, {} FP, {} TN, {} FN.".format(tp, fp, tn, fn))
-    print('Accuracy: {:.4f}'.format((tp+tn)/(tp+tn+fp+fn)))
-    print('Fake Rate (1-Precision): {:.4f}'.format(1.-tp/(tp+fp)))
-    print('Efficiency (TPR): {:.4f}'.format(tp/(tp+fn)))
-    print('True Negative Rate: {:.4f}'.format(tn/(tn+fp)))
-    print('F1 Score {:.4f}'.format(2*tp/(2*tp+fp+fn)))
+    if not multi_class:
+        print('\nTesting results:')
+        print('             ||  Pred False  |  Pred True   |')
+        print('---------------------------------------------')
+        print(f'Actual False || {cm[0,0]:12} | {cm[0,1]:12} |')
+        print(f'Actual True  || {cm[1,0]:12} | {cm[1,1]:12} |')
+        print('---------------------------------------------')
+        print('Accuracy: {:.4f}'.format((cm[1,1]+cm[0,0])/(cm[1,1]+cm[0,0]+cm[0,1]+cm[1,0]))) #(tp+tn)/(tp+tn+fp+fn)
+        print('Fake Rate (1-Precision): {:.4f}'.format(1.-cm[1,1]/(cm[1,1]+cm[0,1]))) #1-tp/(tp+fp)
+        print('Efficiency (TPR): {:.4f}'.format(cm[1,1]/(cm[1,1]+cm[1,0]))) #tp/(tp+fn)
+        print('True Negative Rate: {:.4f}'.format(cm[0,0]/(cm[0,0]+cm[0,1]))) #tn/(tn+fp)
+        print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
+    else:
+        print('\nTesting results:')
+        print('       ||    Pred 0    |    Pred 1    |    Pred 2    |    Pred 3    |    Pred 4    ||  Recall ')
+        print('----------------------------------------------------------------------------------------------')
+        print(f'True 0 || {cm[0,0]:12d} | {cm[0,1]:12d} | {cm[0,2]:12d} | {cm[0,3]:12d} | {cm[0,4]:12d} || {cm[0,0]/(cm[0,0]+cm[0,1]+cm[0,2]+cm[0,3]+cm[0,4]):.4f}')
+        print(f'True 1 || {cm[1,0]:12d} | {cm[1,1]:12d} | {cm[1,2]:12d} | {cm[1,3]:12d} | {cm[1,4]:12d} || {cm[1,1]/(cm[1,0]+cm[1,1]+cm[1,2]+cm[1,3]+cm[1,4]):.4f}')
+        print(f'True 2 || {cm[2,0]:12d} | {cm[2,1]:12d} | {cm[2,2]:12d} | {cm[2,3]:12d} | {cm[2,4]:12d} || {cm[2,2]/(cm[2,0]+cm[2,1]+cm[2,2]+cm[2,3]+cm[2,4]):.4f}')
+        print(f'True 3 || {cm[3,0]:12d} | {cm[3,1]:12d} | {cm[3,2]:12d} | {cm[3,3]:12d} | {cm[3,4]:12d} || {cm[3,3]/(cm[3,0]+cm[3,1]+cm[3,2]+cm[3,3]+cm[3,4]):.4f}')
+        print(f'True 4 || {cm[4,0]:12d} | {cm[4,1]:12d} | {cm[4,2]:12d} | {cm[4,3]:12d} | {cm[4,4]:12d} || {cm[4,4]/(cm[4,0]+cm[4,1]+cm[4,2]+cm[4,3]+cm[4,4]):.4f}')
+        print('----------------------------------------------------------------------------------------------')
+        print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
 
-    #plot loss and TPR/TNR
+    #plot loss
     plt.ioff()
     plt.plot(range(nepochs), train_loss_array, label="Training")
     plt.plot(range(nepochs), val_loss_array, label="Validation")
     plt.legend()
     plt.xlabel("Epoch")
     plt.savefig(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_lossplot.png")
-    
+
     canv1 = TCanvas("c1", "c1", 800, 600)
-    legend = TLegend(0.78,0.75,0.98,0.95)
-    legend.AddEntry(tpr_hist, "#splitline{TPR}{#splitline{%d entries}{mean=%.2f}}"%(tpr_hist.GetEntries(), tpr_hist.GetMean()), "l")
-    legend.AddEntry(tnr_hist, "#splitline{TNR}{#splitline{%d entries}{mean=%.2f}}"%(tnr_hist.GetEntries(), tnr_hist.GetMean()), "l")
-    tpr_hist.SetLineColorAlpha(4,0.65)
-    tpr_hist.SetLineWidth(3)
-    if tpr_hist.Integral(): tpr_hist.Scale(1./tpr_hist.Integral(), "width")
-    tnr_hist.SetLineColorAlpha(3,0.65)
-    tnr_hist.SetLineWidth(3)
-    if tnr_hist.Integral(): tnr_hist.Scale(1./tnr_hist.Integral(), "width")
-    tpr_hist.Draw()
-    tnr_hist.Draw("SAMES")
-    legend.SetTextSize(0.025)
-    legend.Draw("SAME")
-    canv1.SaveAs(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_tpnrplot.png")
+    colorlist = [1,4,8,2,6]
+
+    ext = "_recall.png"
+    for hist_list in [hist_r_list, hist_s_list]:
+        legend = TLegend(0.78,0.95-0.1*max(len(hist_list),2),0.98,0.95)
+        for i in range(len(hist_list)):
+            legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(hist_list[i].GetName(), hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
+            hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
+            hist_list[i].SetLineWidth(3)
+            if hist_list[i].Integral(): hist_list[i].Scale(1./hist_list[i].Integral(), "width")
+            if i == 0: hist_list[i].Draw()
+            else: hist_list[i].Draw("SAMES")
+        legend.SetTextSize(0.025)
+        legend.Draw("SAME")
+        canv1.SaveAs(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+ext)
+        canv1.Clear()
+        ext = "_score.png"
+
 
 if __name__ == '__main__':
     main(sys.argv)

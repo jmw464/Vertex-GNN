@@ -2,9 +2,9 @@
 
 NTUPLES="user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007 user.jmwagner.24900045.Akt4EMPf_BTagging201903._000016"
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
-DATANAME=btag_07_19_cut_v2c
+DATANAME=btag_07_19_cut_test
 
-ENTRIES=100000 #jets used per file (after cuts)
+ENTRIES=500 #jets used per file (after cuts)
 
 NORMED=1
 

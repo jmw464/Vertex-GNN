@@ -1,11 +1,11 @@
 #!/bin/bash
 
-RUN=1
+RUN=0
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATA=btag_07_19_cut_v2c
+DATA=btag_07_19_cut_test
 
-EPOCHS=30
+EPOCHS=3
 LR=0.001
 
 NORMED=1

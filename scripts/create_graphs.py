@@ -18,8 +18,7 @@ nnfeatures = 10 #number of features per node
 nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 
 #matching parameters
-incl_btoc = 1 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
-incl_secondary = 0 #toggle whether to include tracks from secondary processes in SV's based on their HF ancestors
+incl_btoc = 0 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
 
 ###########################################################################################################
 
@@ -63,7 +62,6 @@ def main(argv):
 
     total_jets = len(infile['info']['event'])
     track_offset = 0 #tracks are stored in continuous chunk -> need to offset indices for each jet
-    total_ones = total_edges = 0
     ngraphs = 0
     event_index = previous_event = -1
     for ientry in range(total_jets):
@@ -85,7 +83,8 @@ def main(argv):
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
         flavors = np.zeros((ntracks,1))
-        truth_labels = np.zeros((nedges,1))
+        bin_labels = np.zeros((nedges,1))
+        mult_labels = np.zeros((nedges,1))
         
         #read in features
         for j in range(ntracks):
@@ -120,38 +119,43 @@ def main(argv):
                 edge_features[counter:counter+2] = [delta_pt]
 
                 #truth labels - vertices have to share the same HF ancestor
-                if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] != 0 and flavors[k] != 0: #matching direct ancestors for non secondaries (B to B or C to C)
-                    truth_labels[counter:counter+2] = 1
-                elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C)
-                    truth_labels[counter:counter+2] = incl_btoc
+                if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 1 and flavors[k] == 1: #matching direct ancestors for non secondaries (B to B)
+                    bin_labels[counter:counter+2] = 1
+                    mult_labels[counter:counter+2] = 1
+                elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 2 and flavors[k] == 2: #matching direct ancestors for non secondaries (prompt C to prompt C)
+                    bin_labels[counter:counter+2] = 1
+                    mult_labels[counter:counter+2] = 2
+                elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 3 and flavors[k] == 3: #matching direct ancestors for non secondaries (B->C to B->C for same C)
+                    bin_labels[counter:counter+2] = 1
+                    mult_labels[counter:counter+2] = 3
+                elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C for different C)
+                    bin_labels[counter:counter+2] = incl_btoc
+                    mult_labels[counter:counter+2] = 3*incl_btoc
                 elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or (second_ancestors[j] == ancestors[k] and ancestors[k] > 0): #matching second ancestor and direct ancestor (B to B->C)
-                    truth_labels[counter:counter+2] = incl_btoc
-                elif ancestors[k] == ancestors[j] and ancestors[k] < 0: #matching direct ancestors for secondaries (B to S, C to S or S to S)
-                    truth_labels[counter:counter+2] = incl_secondary
+                    bin_labels[counter:counter+2] = incl_btoc
+                    mult_labels[counter:counter+2] = 3*incl_btoc
+                elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 0 and flavors[k] == 0: #matching direct ancestors for secondaries (S to S)
+                    mult_labels[counter:counter+2] = 4
+                elif ancestors[k] == ancestors[j] and ancestors[k] < 0: #matching fake vertices with no HF ancestors
+                    mult_labels[counter:counter+2] = 4
                 else:
-                    truth_labels[counter:counter+2] = 0
-
-                ####print(ancestors[j], flavors[j], ancestors[k], flavors[k], truth_labels[counter])
+                    mult_labels[counter:counter+2] = 0
 
                 counter += 2
-       
-        total_ones += np.sum(truth_labels)
-        total_edges += np.size(truth_labels)
 
         #create graph objects and append them to the list
         if ntracks > 1:
             g = dgl.graph((create_edge_list(ntracks)))
             g.ndata['features'] = th.from_numpy(node_features)
             g.ndata['info'] = th.from_numpy(node_info)
-            g.edata['labels'] = th.from_numpy(truth_labels)
+            g.edata['bin_labels'] = th.from_numpy(bin_labels)
+            g.edata['mult_labels'] = th.from_numpy(mult_labels)
             g_list.append(g)
             ngraphs += 1
 
         #output progress
         sys.stdout.write("\rProcessed {}% of jets".format(round(ngraphs*100/total_jets)))
         sys.stdout.flush()
-
-    print("\nPercentage of \"True\" labels: {}%".format(total_ones*100/total_edges))
 
     #save graphs to file
     dgl.save_graphs(outfile_name, g_list)
