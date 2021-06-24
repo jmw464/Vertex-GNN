@@ -62,6 +62,21 @@ def main(argv):
     tfeatures['d0'] = []
     tfeatures['z0'] = []
     tfeatures['q'] = []
+    tfeatures['cov_d0d0'] = []
+    tfeatures['cov_d0z0'] = []
+    tfeatures['cov_d0phi'] = []
+    tfeatures['cov_d0theta'] = []
+    tfeatures['cov_d0qoverp'] = []
+    tfeatures['cov_z0z0'] = []
+    tfeatures['cov_z0phi'] = []
+    tfeatures['cov_z0theta'] = []
+    tfeatures['cov_z0qoverp'] = []
+    tfeatures['cov_phiphi'] = []
+    tfeatures['cov_phitheta'] = []
+    tfeatures['cov_phiqoverp'] = []
+    tfeatures['cov_thetatheta'] = []
+    tfeatures['cov_thetaqoverp'] = []
+    tfeatures['cov_qoverpqoverp'] = []
 
     efeatures = dict()
     efeatures['event_vx'] = []
@@ -109,6 +124,21 @@ def main(argv):
             t_d0 = []
             t_z0 = []
             t_q = []
+            t_cov_d0d0 = []
+            t_cov_d0z0 = []
+            t_cov_d0phi = []
+            t_cov_d0theta = []
+            t_cov_d0qoverp = []
+            t_cov_z0z0 = []
+            t_cov_z0phi = []
+            t_cov_z0theta = []
+            t_cov_z0qoverp = []
+            t_cov_phiphi = []
+            t_cov_phitheta = []
+            t_cov_phiqoverp = []
+            t_cov_thetatheta = []
+            t_cov_thetaqoverp = []
+            t_cov_qoverpqoverp = []
             t_ancestor = []
             t_second_ancestor = []
             t_flavor = []
@@ -136,6 +166,21 @@ def main(argv):
                         t_d0.append(entry.jet_trk_d0[i][j])
                         t_z0.append(entry.jet_trk_z0[i][j])
                         t_q.append(entry.jet_trk_charge[i][j])
+                        t_cov_d0d0.append(entry.jet_trk_cov_d0d0[i][j])
+                        t_cov_d0z0.append(entry.jet_trk_cov_d0z0[i][j])
+                        t_cov_d0phi.append(entry.jet_trk_cov_d0phi[i][j])
+                        t_cov_d0theta.append(entry.jet_trk_cov_d0theta[i][j])
+                        t_cov_d0qoverp.append(entry.jet_trk_cov_d0qoverp[i][j])
+                        t_cov_z0z0.append(entry.jet_trk_cov_z0z0[i][j])
+                        t_cov_z0phi.append(entry.jet_trk_cov_z0phi[i][j])
+                        t_cov_z0theta.append(entry.jet_trk_cov_z0theta[i][j])
+                        t_cov_z0qoverp.append(entry.jet_trk_cov_z0qoverp[i][j])
+                        t_cov_phiphi.append(entry.jet_trk_cov_phiphi[i][j])
+                        t_cov_phitheta.append(entry.jet_trk_cov_phitheta[i][j])
+                        t_cov_phiqoverp.append(entry.jet_trk_cov_phiqoverp[i][j])
+                        t_cov_thetatheta.append(entry.jet_trk_cov_thetatheta[i][j])
+                        t_cov_thetaqoverp.append(entry.jet_trk_cov_thetaqoverp[i][j])
+                        t_cov_qoverpqoverp.append(entry.jet_trk_cov_qoverpqoverp[i][j])
 
                 track_dict, jet_cut_trk = build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut)
                 um_other_tracks = np.array([])
@@ -189,6 +234,21 @@ def main(argv):
                 tfeatures['d0'].extend(t_d0)
                 tfeatures['z0'].extend(t_z0)
                 tfeatures['q'].extend(t_q)
+                tfeatures['cov_d0d0'].extend(t_cov_d0d0)
+                tfeatures['cov_d0z0'].extend(t_cov_d0z0)
+                tfeatures['cov_d0phi'].extend(t_cov_d0phi)
+                tfeatures['cov_d0theta'].extend(t_cov_d0theta)
+                tfeatures['cov_d0qoverp'].extend(t_cov_d0qoverp)
+                tfeatures['cov_z0z0'].extend(t_cov_z0z0)
+                tfeatures['cov_z0phi'].extend(t_cov_z0phi)
+                tfeatures['cov_z0theta'].extend(t_cov_z0theta)
+                tfeatures['cov_z0qoverp'].extend(t_cov_z0qoverp)
+                tfeatures['cov_phiphi'].extend(t_cov_phiphi)
+                tfeatures['cov_phitheta'].extend(t_cov_phitheta)
+                tfeatures['cov_phiqoverp'].extend(t_cov_phiqoverp)
+                tfeatures['cov_thetatheta'].extend(t_cov_thetatheta)
+                tfeatures['cov_thetaqoverp'].extend(t_cov_thetaqoverp)
+                tfeatures['cov_qoverpqoverp'].extend(t_cov_qoverpqoverp)
 
                 labels['ancestor'].extend(t_ancestor)
                 labels['second_ancestor'].extend(t_second_ancestor)

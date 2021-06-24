@@ -1,10 +1,10 @@
 #!/bin/bash
 
-NTUPLES="user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007 user.jmwagner.24900045.Akt4EMPf_BTagging201903._000016"
+NTUPLES="user.jmwagner.25874500.Akt4EMPf_BTagging201903._000005" #user.jmwagner.24900045.Akt4EMPf_BTagging201903._000007 user.jmwagner.24900045.Akt4EMPf_BTagging201903._000016"
 DATADIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/data/
-DATANAME=btag_07_19_cut_test
+DATANAME=btag_05_19_cut_v3c
 
-ENTRIES=500 #jets used per file (after cuts)
+ENTRIES=100000 #jets used per file (after cuts)
 
 NORMED=1
 

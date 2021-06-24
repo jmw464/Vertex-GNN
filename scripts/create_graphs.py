@@ -14,11 +14,11 @@ import time
 #############################################SCRIPT PARAMS#################################################
 
 #input data parameters
-nnfeatures = 10 #number of features per node
+nnfeatures = 13 #number of features per node
 nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
 
 #matching parameters
-incl_btoc = 0 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
+incl_btoc = 1 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
 
 ###########################################################################################################
 
@@ -89,12 +89,27 @@ def main(argv):
         #read in features
         for j in range(ntracks):
             track_pt  = infile['tfeatures']['pt'][track_offset+j]/1000 #convert to GeV
-            track_eta = infile['tfeatures']['eta'][track_offset+j]
+            track_eta = infile['tfeatures']['eta'][track_offset+j] #not used
             track_theta = infile['tfeatures']['theta'][track_offset+j]
             track_phi = infile['tfeatures']['phi'][track_offset+j]
             track_d0 = infile['tfeatures']['d0'][track_offset+j]
             track_z0 = infile['tfeatures']['z0'][track_offset+j]
             track_q = infile['tfeatures']['q'][track_offset+j]
+            track_cov_d0d0 = infile['tfeatures']['cov_d0d0'][track_offset+j]
+            track_cov_d0z0 = infile['tfeatures']['cov_d0z0'][track_offset+j] #not used
+            track_cov_d0phi = infile['tfeatures']['cov_d0phi'][track_offset+j] #not used
+            track_cov_d0theta = infile['tfeatures']['cov_d0theta'][track_offset+j] #not used
+            track_cov_d0qoverp = infile['tfeatures']['cov_d0qoverp'][track_offset+j] #not used
+            track_cov_z0z0 = infile['tfeatures']['cov_z0z0'][track_offset+j]
+            track_cov_z0phi = infile['tfeatures']['cov_z0phi'][track_offset+j] #not used
+            track_cov_z0theta = infile['tfeatures']['cov_z0theta'][track_offset+j] #not used
+            track_cov_z0qoverp = infile['tfeatures']['cov_z0qoverp'][track_offset+j] #not used
+            track_cov_phiphi = infile['tfeatures']['cov_phiphi'][track_offset+j]
+            track_cov_phitheta = infile['tfeatures']['cov_phitheta'][track_offset+j] #not used
+            track_cov_phiqoverp = infile['tfeatures']['cov_phiqoverp'][track_offset+j] #not used
+            track_cov_thetatheta = infile['tfeatures']['cov_thetatheta'][track_offset+j]
+            track_cov_thetaqoverp = infile['tfeatures']['cov_thetaqoverp'][track_offset+j] #not used
+            track_cov_qoverpqoverp = infile['tfeatures']['cov_qoverpqoverp'][track_offset+j] #not used
 
             jet_pt = infile['jfeatures']['pt'][ientry]/1000 #convert to GeV
             jet_eta = infile['jfeatures']['eta'][ientry]
@@ -103,7 +118,7 @@ def main(argv):
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
             second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
-            node_features[j] = [track_pt, track_eta, track_theta, track_phi, track_d0, track_z0, track_q, jet_pt, jet_eta, jet_phi]
+            node_features[j] = [track_pt, track_theta, track_cov_thetatheta, track_phi, track_cov_phiphi, track_d0, track_cov_d0d0, track_z0, track_cov_z0z0, track_q, jet_pt, jet_eta, jet_phi]
             node_info[j] = [0, current_event, current_jet]
 
         track_offset += ntracks
@@ -161,7 +176,7 @@ def main(argv):
     dgl.save_graphs(outfile_name, g_list)
 
     p_time = time.time()-start_time
-    print("Finished creating graphs. Time elapsed: {}s.".format(p_time))
+    print("\nFinished creating graphs. Time elapsed: {}s.".format(p_time))
 
 
 if __name__ == '__main__':

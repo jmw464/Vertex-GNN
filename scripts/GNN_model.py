@@ -86,4 +86,5 @@ class EdgePredModel(nn.Module):
         h1 = self.nodemlp(x)
         h2 = self.gcn(g, x)
         h = self.edgemlp(g, h1, h2)
+        g.edata['pred'] = h #still needs to be passed through an activation function
         return h

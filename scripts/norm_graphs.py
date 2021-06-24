@@ -45,14 +45,22 @@ def main(argv):
     std_features = np.sqrt(std_features/total_tracks)
 
     #manually set normalization parameters for special features (features that have a fixed range are set to vary from -1 to 1)
-    mean_features[2] = math.pi/2. #track theta varies from 0 to pi
-    std_features[2] = math.pi/2.
+    mean_features[1] = math.pi/2. #track theta varies from 0 to pi
+    std_features[1] = math.pi/2.
+    mean_features[2] = 0 #theta error varies with theta
+    std_features[2] = 1#std_features[1]
     mean_features[3] = 0 #track phi varies from -pi to pi
     std_features[3] = math.pi
-    mean_features[6] = 0 #q is either -1 or 1
-    std_features[6] = 1
-    mean_features[9] = 0 #jet phi varies from -pi to pi
-    std_features[9] = math.pi
+    mean_features[4] = 0 #phi error varies with phi
+    std_features[4] = 1#std_features[3]
+    mean_features[6] = 0 #d0 error varies with d0
+    std_features[6] = 1#std_features[5]
+    mean_features[8] = 0 #z0 error varies with z0
+    std_features[8] = 1#std_features[7]
+    mean_features[9] = 0 #q is either -1 or 1
+    std_features[9] = 1
+    mean_features[12] = 0 #jet phi varies from -pi to pi
+    std_features[12] = math.pi
 
     #apply normalization from training data to all graph features
     print("Normalizing {} training graphs".format(len(train_graphs)))

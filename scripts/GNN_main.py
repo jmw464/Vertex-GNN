@@ -28,7 +28,7 @@ batch_size = 10000 #number of jets in a single training batch
 
 #model parameters
 attention_heads = 1 #number of attention heads in GAT layer -> these are averaged over
-in_features = 10 #number of unique features per node
+in_features = 13 #number of unique features per node
 nodemlp_sizes = [in_features, 20]
 gat_sizes = [in_features, 128, 256]
 edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128] #excluding output features
@@ -37,10 +37,10 @@ edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128] #excluding outpu
 reweight = True #reweight positive labels in loss to make positives and negatives equally important
 load_checkpoint = False
 use_lr_scheduler = False
-multi_class = True
+multi_class = False
 
 #bad jet criteria for each category
-mult_threshold = [0.7, 0.7, 0.7, 0.7, 0.7] #0, 1, 2, 3, 4
+mult_threshold = [0.5, 0.1, 0.1, 0.7, 0.1] #0, 1, 2, 3, 4 (none, b, c, b->c, other)
 bin_threshold = [0.5, 0.7] #False, True
 
 ###########################################################################################################
@@ -70,73 +70,37 @@ def evaluate_confusion_mult(true, pred):
 
 
 #print results, list of events GNN performs poorly on and make TPR/TNR plots for binary classification
-def evaluate_results(pred, true, node_info, outfile, hist_list, multi_class):
-    file_list = node_info[:,0]
-    event_list = node_info[:,1]
-    jet_list = node_info[:,2]
-    bad_events = np.empty((0,3), dtype=np.int)
+def evaluate_jet(graph, hist_list, bad_events, multi_class):
+
+    pred = graph.edata['pred'].cpu().detach().numpy().astype(int)
+    node_info = graph.ndata['info'].cpu().detach().numpy().astype(int)
 
     #store recall for each class
     if not multi_class:
         r_array = np.zeros(2)
+        true = graph.edata['bin_labels'].cpu().detach().numpy().astype(int)
+        cm = evaluate_confusion_bin(true, pred)
+        r_threshold = bin_threshold
     else:
         r_array = np.zeros(5)
-
-    eindex_begin = eindex_end = ntracks = 0
-    current_file = file_list[0]
-    current_event = event_list[0]
-    current_jet = jet_list[0]
-    total_bad = total = 0
-
-    for i in range(len(event_list)+1): #+1 is there to ensure the last jet gets checked as well
-        if i == len(event_list) or current_jet != jet_list[i] or current_event != event_list[i] or current_file != file_list[i]:
-            eindex_begin = eindex_end
-            eindex_end += ntracks*(ntracks-1)
-            ntracks = 1
-            rel_pred = pred[eindex_begin:eindex_end]
-            rel_true = true[eindex_begin:eindex_end]
-
-            if not multi_class:
-                cm = evaluate_confusion_bin(rel_true, rel_pred)
-                r_threshold = bin_threshold
-            else:
-                cm = evaluate_confusion_mult(rel_true, rel_pred)
-                r_threshold = mult_threshold
+        true = graph.edata['mult_labels'].cpu().detach().numpy().astype(int)
+        cm = evaluate_confusion_mult(true, pred)
+        r_threshold = mult_threshold
             
-            #fill histograms and r_array to determine bad events
-            for j in range(cm.shape[0]):
-                if np.sum(cm[j,:]) != 0:
-                    r_array[j] = cm[j,j]/np.sum(cm[j,:])
-                    hist_list[j].Fill(r_array[j])
-                else:
-                    r_array[j] = -1
-
-            for j in range(cm.shape[0]):
-                if r_array[j] < r_threshold[j] and r_array[j] >= 0:
-                    bad_events = np.append(bad_events, [[current_file, current_event, current_jet]], axis=0)
-                    total_bad += 1
-                    break
-
-            total += 1
-
+    #fill histograms and r_array to determine bad events
+    for j in range(cm.shape[0]):
+        if np.sum(cm[j,:]) != 0:
+            r_array[j] = cm[j,j]/np.sum(cm[j,:])
+            hist_list[j].Fill(r_array[j])
         else:
-            ntracks += 1
+            r_array[j] = -1
 
-        if i != len(event_list):
-            current_file = file_list[i]
-            current_event = event_list[i]
-            current_jet = jet_list[i]
+    for j in range(cm.shape[0]):
+        if r_array[j] < r_threshold[j] and r_array[j] >= 0:
+            bad_events = np.append(bad_events, [[node_info[0,0], node_info[0,1], node_info[0,2]]], axis=0)
+            break
 
-    #sort array with bad events by file, event and jet
-    indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
-    bad_events = bad_events[indices]
-    
-    for i in range(np.shape(bad_events)[0]):
-        outfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
-
-    print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total, total))
-
-    return hist_list
+    return bad_events
 
 
 def main(argv):
@@ -199,12 +163,12 @@ def main(argv):
 
     #reweight positive labels automatically if desired
     if reweight:
-        pos_weight = th.tensor([(1-truth_frac)/truth_frac])
-        mult_weights = th.tensor([1/(1-b_frac-c_frac-btoc_frac-o_frac), 1/b_frac, 1/c_frac, 1/btoc_frac, 1/o_frac])
+        pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
+        mult_weights = th.tensor([1./(1-b_frac-c_frac-btoc_frac-o_frac), 1./b_frac, 1./c_frac, 1./btoc_frac, 1./o_frac])
         print("Setting positive weight to {}".format(pos_weight))
     else:
         pos_weight = th.tensor([1])
-        mult_weights = th.tensor([1, 1, 1, 1, 1])
+        mult_weights = th.tensor([1., 1., 1., 1., 1.])
 
     #calculate number of testing, training and validation batches
     test_batches = int(math.ceil(test_len/batch_size))
@@ -364,17 +328,18 @@ def main(argv):
 
         #process batch
         test_batch = test_batch.to(device)
-        node_features = test_batch.ndata['features']
         node_info = test_batch.ndata['info'].cpu().numpy()
         edge_labels = test_batch.edata[labeltype]
         
         #evaluate results
         pred = activation(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy()
-        
+        true = test_batch.edata[labeltype].cpu().numpy().astype(int)
+
         if not multi_class:
             for i in range(pred.shape[0]):
                 edge_score_hist.Fill(pred[i,0])
             pred = pred.round().astype(int)
+            test_batch.edata['pred'] = th.round(activation(test_batch.edata['pred']))
         else:
             for i in range(pred.shape[0]):
                 neg_score_hist.Fill(pred[i,0])
@@ -382,10 +347,25 @@ def main(argv):
                 c_score_hist.Fill(pred[i,2])
                 btoc_score_hist.Fill(pred[i,3])
                 o_score_hist.Fill(pred[i,4])
-            pred = np.argmax(pred, axis=1)
-        
-        true = test_batch.edata[labeltype].cpu().numpy().astype(int)
-        hist_r_list = evaluate_results(pred, true, node_info, registerfile, hist_r_list, multi_class)
+            pred = np.argmax(pred, axis=1).astype(int)
+            test_batch.edata['pred'] = th.argmax(activation(test_batch.edata['pred']), dim=1, keepdim=True)
+
+        g_test_list = dgl.unbatch(test_batch)
+        bad_events = np.empty((0,3), dtype=np.int)
+        for g in g_test_list:
+            bad_events = evaluate_jet(g, hist_r_list, bad_events, multi_class)
+
+        total_jets = len(g_test_list)
+        total_bad = np.shape(bad_events)[0]
+
+        #sort array with bad events by file, event and jet
+        indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
+        bad_events = bad_events[indices]
+    
+        for i in range(total_bad):
+            registerfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
+
+        print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total_jets, total_jets))
 
         if not multi_class:
             cm += evaluate_confusion_bin(true, pred)
