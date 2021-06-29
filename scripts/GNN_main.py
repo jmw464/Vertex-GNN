@@ -3,6 +3,7 @@
 #GNN for secondary vertex reconstructions
 
 from GNN_model import *
+from GNN_eval import *
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -14,7 +15,7 @@ import os,sys,math,glob,time
 import numpy as np
 import argparse
 import ROOT
-from ROOT import gROOT, TFile, TH1D, TLegend, TCanvas
+from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas
 import matplotlib.pyplot as plt
 
 #th.set_printoptions(edgeitems=10000)
@@ -29,78 +30,22 @@ batch_size = 10000 #number of jets in a single training batch
 #model parameters
 attention_heads = 1 #number of attention heads in GAT layer -> these are averaged over
 in_features = 13 #number of unique features per node
-nodemlp_sizes = [in_features, 20]
+nodemlp_sizes = [in_features, 40]
 gat_sizes = [in_features, 128, 256]
-edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128] #excluding output features
+edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128, 64] #excluding output features
 
 #script options
 reweight = True #reweight positive labels in loss to make positives and negatives equally important
-load_checkpoint = False
-use_lr_scheduler = False
+load_checkpoint = True
+use_lr_scheduler = True
 multi_class = False
 
 #bad jet criteria for each category
 mult_threshold = [0.5, 0.1, 0.1, 0.7, 0.1] #0, 1, 2, 3, 4 (none, b, c, b->c, other)
 bin_threshold = [0.5, 0.7] #False, True
+score_threshold = 0.6 #threshold for two edges to be able to be associated
 
 ###########################################################################################################
-
-
-#evaluate confusion matrix for binary case
-def evaluate_confusion_bin(true, pred):
-
-    cm = np.zeros((2,2),dtype=int)
-    cm[1,1] = np.sum((true[:,0] == 1) & (pred[:,0] == 1)) #true positive - actually true, marked as true
-    cm[0,0] = np.sum((true[:,0] == 0) & (pred[:,0] == 0)) #true negative - actually false, marked as false
-    cm[0,1] = np.sum((true[:,0] == 0) & (pred[:,0] == 1)) #false positive - actually false, marked as true
-    cm[1,0] = np.sum((true[:,0] == 1) & (pred[:,0] == 0)) #false negative - actually true, marked as false
-    
-    return cm
-
-
-#evaluate confusion matrix for multi-class case
-def evaluate_confusion_mult(true, pred):
-
-    cm = np.zeros((5,5),dtype=int)
-    for i in range(5):
-        for j in range(5):
-            cm[i,j] = np.sum((true[:,0] == i) & (pred[:] == j))
-    
-    return cm
-
-
-#print results, list of events GNN performs poorly on and make TPR/TNR plots for binary classification
-def evaluate_jet(graph, hist_list, bad_events, multi_class):
-
-    pred = graph.edata['pred'].cpu().detach().numpy().astype(int)
-    node_info = graph.ndata['info'].cpu().detach().numpy().astype(int)
-
-    #store recall for each class
-    if not multi_class:
-        r_array = np.zeros(2)
-        true = graph.edata['bin_labels'].cpu().detach().numpy().astype(int)
-        cm = evaluate_confusion_bin(true, pred)
-        r_threshold = bin_threshold
-    else:
-        r_array = np.zeros(5)
-        true = graph.edata['mult_labels'].cpu().detach().numpy().astype(int)
-        cm = evaluate_confusion_mult(true, pred)
-        r_threshold = mult_threshold
-            
-    #fill histograms and r_array to determine bad events
-    for j in range(cm.shape[0]):
-        if np.sum(cm[j,:]) != 0:
-            r_array[j] = cm[j,j]/np.sum(cm[j,:])
-            hist_list[j].Fill(r_array[j])
-        else:
-            r_array[j] = -1
-
-    for j in range(cm.shape[0]):
-        if r_array[j] < r_threshold[j] and r_array[j] >= 0:
-            bad_events = np.append(bad_events, [[node_info[0,0], node_info[0,1], node_info[0,2]]], axis=0)
-            break
-
-    return bad_events
 
 
 def main(argv):
@@ -259,7 +204,6 @@ def main(argv):
 
         #validation
         total_labels = 0
-
         model.eval()
         for ibatch in range(val_batches):
 
@@ -298,8 +242,15 @@ def main(argv):
         pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Entries",10,0,1.001) #1.001 is the upper bound so this is inclusive of 1
         neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Entries",10,0,1.001)
         edge_score_hist = TH1D("", "Edges scores;Score;Entries",10,0,1.001)
+        sv1_corrp_hist = TH1D("SV1", "Percentage of tracks from true SV in predicted SV;Percentage;Entries",10,-0.001,1.001)
+        sv1_fakep_hist = TH1D("SV1 ", "Percentage of tracks in predicted SV not found in true SV;Percentage;Entries",10,-0.001,1.001)
+        gnn_corrp_hist = TH1D("GNN", "Percentage of tracks from true SV in predicted SV;Percentage;Entries",10,-0.001,1.001)
+        gnn_fakep_hist = TH1D("GNN ", "Percentage of tracks in predicted SV not found in true SV;Percentage;Entries",10,-0.001,1.001)
+
         hist_r_list = [neg_r_hist, pos_r_hist]
         hist_s_list = [edge_score_hist]
+        hist_pc_list = [gnn_corrp_hist, sv1_corrp_hist]
+        hist_pf_list = [gnn_fakep_hist, sv1_fakep_hist]
     else:
         neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Entries",10,0,1.001)
         b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Entries",10,0,1.001)
@@ -311,8 +262,17 @@ def main(argv):
         c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Entries",10,0,1.001)
         btoc_score_hist = TH1D("Class 3 scores", "Class scores;Score;Entries",10,0,1.001)
         o_score_hist = TH1D("Class 4 scores", "Class scores;Score;Entries",10,0,1.001)
+
         hist_r_list = [neg_r_hist, b_r_hist, c_r_hist, btoc_r_hist, o_r_hist]
         hist_s_list = [neg_score_hist, b_score_hist, c_score_hist, btoc_score_hist, o_score_hist]
+
+    #initialize matrices for overall SV predictions and plots
+    gnn_cm = np.zeros((3,3), dtype=int)
+    sv1_cm = np.zeros((3,3), dtype=int)
+
+    #initialize overall bad events matrix
+    bad_events = np.empty((0,3), dtype=np.int)
+    total_bad = total_jets = 0
 
     #testing
     model.eval()
@@ -335,11 +295,11 @@ def main(argv):
         pred = activation(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy()
         true = test_batch.edata[labeltype].cpu().numpy().astype(int)
 
+        #fill edge score histograms
         if not multi_class:
             for i in range(pred.shape[0]):
                 edge_score_hist.Fill(pred[i,0])
             pred = pred.round().astype(int)
-            test_batch.edata['pred'] = th.round(activation(test_batch.edata['pred']))
         else:
             for i in range(pred.shape[0]):
                 neg_score_hist.Fill(pred[i,0])
@@ -348,24 +308,36 @@ def main(argv):
                 btoc_score_hist.Fill(pred[i,3])
                 o_score_hist.Fill(pred[i,4])
             pred = np.argmax(pred, axis=1).astype(int)
-            test_batch.edata['pred'] = th.argmax(activation(test_batch.edata['pred']), dim=1, keepdim=True)
+
+        test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
         g_test_list = dgl.unbatch(test_batch)
-        bad_events = np.empty((0,3), dtype=np.int)
+
+        #evaluate bad events and find secondary vertices
         for g in g_test_list:
-            bad_events = evaluate_jet(g, hist_r_list, bad_events, multi_class)
+            bad_events = evaluate_jet(g, hist_r_list, bad_events, multi_class, bin_threshold, mult_threshold)
+            
+            if not multi_class:
+                gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
+                true_vertices = find_vertices_bin(g, 'truth', score_threshold)
+                sv1_vertex = np.argwhere(g.ndata['reco_labels'].cpu().numpy().astype(int)[:,1]).flatten()
+                if sv1_vertex.size > 0: sv1_vertex = [sv1_vertex]
 
-        total_jets = len(g_test_list)
-        total_bad = np.shape(bad_events)[0]
+                jet_gnn_cm, gnn_vertex_metrics = compare_vertices(true_vertices, gnn_vertices)
+                jet_sv1_cm, sv1_vertex_metrics = compare_vertices(true_vertices, sv1_vertex)
+                gnn_cm += jet_gnn_cm
+                sv1_cm += jet_sv1_cm
 
-        #sort array with bad events by file, event and jet
-        indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
-        bad_events = bad_events[indices]
-    
-        for i in range(total_bad):
-            registerfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
+                for vertex_metric in gnn_vertex_metrics:
+                    hist_pc_list[0].Fill(vertex_metric[0])
+                    hist_pf_list[0].Fill(vertex_metric[1])
 
-        print("Marked {}% of {} jets as bad in batch".format(100*total_bad/total_jets, total_jets))
+                for vertex_metric in sv1_vertex_metrics:
+                    hist_pc_list[1].Fill(vertex_metric[0])
+                    hist_pf_list[1].Fill(vertex_metric[1])
+        
+        total_jets += len(g_test_list)
+        total_bad += np.shape(bad_events)[0]
 
         if not multi_class:
             cm += evaluate_confusion_bin(true, pred)
@@ -374,6 +346,7 @@ def main(argv):
 
     #print test results
     if not multi_class:
+        hist_list_list = [hist_r_list, hist_s_list, hist_pc_list, hist_pf_list]
         print('\nTesting results:')
         print('             ||  Pred False  |  Pred True   |')
         print('---------------------------------------------')
@@ -385,7 +358,16 @@ def main(argv):
         print('Efficiency (TPR): {:.4f}'.format(cm[1,1]/(cm[1,1]+cm[1,0]))) #tp/(tp+fn)
         print('True Negative Rate: {:.4f}'.format(cm[0,0]/(cm[0,0]+cm[0,1]))) #tn/(tn+fp)
         print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
+        print('Secondary Vertex prediction results per jet (GNN/SV1):')
+        print('             ||  Pred no SV   |   Pred 1 SV   |   Pred >1 SV  |')
+        print('---------------------------------------------------------------')
+        print(f'Actual no SV || {gnn_cm[0,0]:5} /{sv1_cm[0,0]:6} | {gnn_cm[0,1]:5} /{sv1_cm[0,1]:6} | {gnn_cm[0,2]:5} /{sv1_cm[0,2]:6} |')
+        print(f'Actual 1 SV  || {gnn_cm[1,0]:5} /{sv1_cm[1,0]:6} | {gnn_cm[1,1]:5} /{sv1_cm[1,1]:6} | {gnn_cm[1,2]:5} /{sv1_cm[1,2]:6} |')
+        print(f'Actual >1 SV || {gnn_cm[2,0]:5} /{sv1_cm[2,0]:6} | {gnn_cm[2,1]:5} /{sv1_cm[2,1]:6} | {gnn_cm[2,2]:5} /{sv1_cm[2,2]:6} |')
+        print('---------------------------------------------------------------')
+
     else:
+        hist_list_list = [hist_r_list, hist_s_list]
         print('\nTesting results:')
         print('       ||    Pred 0    |    Pred 1    |    Pred 2    |    Pred 3    |    Pred 4    ||  Recall ')
         print('----------------------------------------------------------------------------------------------')
@@ -397,6 +379,15 @@ def main(argv):
         print('----------------------------------------------------------------------------------------------')
         print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
 
+    #sort array with bad events by file, event and jet
+    indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
+    bad_events = bad_events[indices]
+    
+    #output bad events to file
+    for i in range(total_bad):
+        registerfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
+    print("\nMarked {}% of {} jets as bad".format(100*total_bad/total_jets, total_jets))
+
     #plot loss
     plt.ioff()
     plt.plot(range(nepochs), train_loss_array, label="Training")
@@ -405,24 +396,10 @@ def main(argv):
     plt.xlabel("Epoch")
     plt.savefig(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_lossplot.png")
 
-    canv1 = TCanvas("c1", "c1", 800, 600)
-    colorlist = [1,4,8,2,6]
-
-    ext = "_recall.png"
-    for hist_list in [hist_r_list, hist_s_list]:
-        legend = TLegend(0.78,0.95-0.1*max(len(hist_list),2),0.98,0.95)
-        for i in range(len(hist_list)):
-            legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(hist_list[i].GetName(), hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
-            hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
-            hist_list[i].SetLineWidth(3)
-            if hist_list[i].Integral(): hist_list[i].Scale(1./hist_list[i].Integral(), "width")
-            if i == 0: hist_list[i].Draw()
-            else: hist_list[i].Draw("SAMES")
-        legend.SetTextSize(0.025)
-        legend.Draw("SAME")
-        canv1.SaveAs(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+ext)
-        canv1.Clear()
-        ext = "_score.png"
+    ext = ["_recall.png", "_score.png", "_corr_p.png", "_fake_p.png"]
+    outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
+    for i in range(len(hist_list_list)):
+        plot_hist(hist_list_list[i], outfile_name, ext[i])
 
 
 if __name__ == '__main__':

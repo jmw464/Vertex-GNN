@@ -85,6 +85,7 @@ def main(argv):
         flavors = np.zeros((ntracks,1))
         bin_labels = np.zeros((nedges,1))
         mult_labels = np.zeros((nedges,1))
+        reco_labels = np.zeros((ntracks,2))
         
         #read in features
         for j in range(ntracks):
@@ -111,6 +112,8 @@ def main(argv):
             track_cov_thetaqoverp = infile['tfeatures']['cov_thetaqoverp'][track_offset+j] #not used
             track_cov_qoverpqoverp = infile['tfeatures']['cov_qoverpqoverp'][track_offset+j] #not used
 
+            track_algo = infile['labels']['algo'][track_offset+j]
+
             jet_pt = infile['jfeatures']['pt'][ientry]/1000 #convert to GeV
             jet_eta = infile['jfeatures']['eta'][ientry]
             jet_phi = infile['jfeatures']['phi'][ientry]
@@ -120,6 +123,7 @@ def main(argv):
             flavors[j] = infile['labels']['flavor'][track_offset+j]
             node_features[j] = [track_pt, track_theta, track_cov_thetatheta, track_phi, track_cov_phiphi, track_d0, track_cov_d0d0, track_z0, track_cov_z0z0, track_q, jet_pt, jet_eta, jet_phi]
             node_info[j] = [0, current_event, current_jet]
+            reco_labels[j] = [(track_algo & 1 << 2)/4, (track_algo & 1 << 3)/8]
 
         track_offset += ntracks
 
@@ -163,6 +167,7 @@ def main(argv):
             g = dgl.graph((create_edge_list(ntracks)))
             g.ndata['features'] = th.from_numpy(node_features)
             g.ndata['info'] = th.from_numpy(node_info)
+            g.ndata['reco_labels'] = th.from_numpy(reco_labels)
             g.edata['bin_labels'] = th.from_numpy(bin_labels)
             g.edata['mult_labels'] = th.from_numpy(mult_labels)
             g_list.append(g)

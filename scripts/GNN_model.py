@@ -42,7 +42,8 @@ class EdgeMLP(nn.Module):
         super().__init__()
         self.lin1 = nn.Linear(edgemlp_size[0], edgemlp_size[1])
         self.lin2 = nn.Linear(edgemlp_size[1], edgemlp_size[2])
-        self.lin3 = nn.Linear(edgemlp_size[2], out_features)
+        self.lin3 = nn.Linear(edgemlp_size[2], edgemlp_size[3])
+        self.lin4 = nn.Linear(edgemlp_size[3], out_features)
     
     def apply_edges(self, edges):
         h1_u = edges.src['h1']
@@ -55,6 +56,8 @@ class EdgeMLP(nn.Module):
         h = self.lin2(h)
         h = th.sigmoid(h)
         h = self.lin3(h)
+        h = th.sigmoid(h)
+        h = self.lin4(h)
         return {'score': h}
     
     def forward(self, g, h1, h2):

@@ -87,6 +87,7 @@ def main(argv):
     labels['ancestor'] = []
     labels['flavor'] = []
     labels['second_ancestor'] = [] #only gets determined for B->C tracks
+    labels['algo'] = []
 
     total_rem_tracks = 0
     total_tracks = 0
@@ -142,6 +143,7 @@ def main(argv):
             t_ancestor = []
             t_second_ancestor = []
             t_flavor = []
+            t_algo = []
 
             total_jets += 1
 
@@ -181,6 +183,7 @@ def main(argv):
                         t_cov_thetatheta.append(entry.jet_trk_cov_thetatheta[i][j])
                         t_cov_thetaqoverp.append(entry.jet_trk_cov_thetaqoverp[i][j])
                         t_cov_qoverpqoverp.append(entry.jet_trk_cov_qoverpqoverp[i][j])
+                        t_algo.append(entry.jet_trk_algo[i][j])
 
                 track_dict, jet_cut_trk = build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut)
                 um_other_tracks = np.array([])
@@ -253,6 +256,7 @@ def main(argv):
                 labels['ancestor'].extend(t_ancestor)
                 labels['second_ancestor'].extend(t_second_ancestor)
                 labels['flavor'].extend(t_flavor)
+                labels['algo'].extend(t_algo)
 
                 info['event'].append(ientry)
                 info['jet'].append(i)
