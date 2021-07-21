@@ -4,13 +4,8 @@ import os,sys,math,glob,random,ROOT
 import numpy as np
 import argparse
 
-#############################################SCRIPT PARAMS#################################################
+import options
 
-#output data parameters
-valp = 0.2 #fraction of data used for validation
-testp = 0.1 #fraction of data used for testing
-
-###########################################################################################################
 
 def main(argv):
 
@@ -26,6 +21,10 @@ def main(argv):
     data_name = args.data_name
     ntuples = args.ntuples.split()
     ntuples.sort()
+
+    #import options from option file
+    valp = options.valp
+    testp = options.testp
 
     paramfile_name = data_path+data_name+"_params"
     train_outfile_name = data_path+data_name+"_train.bin"

@@ -11,16 +11,7 @@ from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
 import matplotlib.pyplot as plt
 import time
 
-#############################################SCRIPT PARAMS#################################################
-
-#input data parameters
-nnfeatures = 13 #number of features per node
-nefeatures = 1 #number of features per edge -- NOT CURRENTLY USED
-
-#matching parameters
-incl_btoc = 1 #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's separate them based on their direct HF ancestors
-
-###########################################################################################################
+import options
 
 
 #create the edge list for a complete graph with n nodes
@@ -52,6 +43,19 @@ def main(argv):
     data_path = args.data_dir
     data_name = args.data_name
 
+    #input data parameters
+    nnfeatures_base = options.nnfeatures_base
+    nnfeatures_errors = options.nnfeatures_errors
+    nnfeatures_corrs = options.nnfeatures_corrs
+    nnfeatures_hits = options.nnfeatures_hits
+    nefeatures = options.nefeatures
+    incl_errors = options.incl_errors
+    incl_corr = options.incl_corr
+    incl_hits = options.incl_hits
+    incl_btoc = options.incl_btoc
+
+    nnfeatures = nnfeatures_base + int(incl_errors)*nnfeatures_errors + int(incl_corr)*nnfeatures_corrs + int(incl_hits)*nnfeatures_hits
+
     #file names
     infile_name = data_path+data_name+".hdf5"
     outfile_name = data_path+data_name+".bin"
@@ -79,7 +83,7 @@ def main(argv):
         #initialize empty arrays
         node_features = np.zeros((ntracks,nnfeatures))
         node_info = np.zeros((ntracks, 3)) #store event info - file (set in combine_graphs.py), event, jet
-        edge_features = np.zeros((nedges,nefeatures))
+        #edge_features = np.zeros((nedges,nefeatures))
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
         flavors = np.zeros((ntracks,1))
@@ -96,21 +100,34 @@ def main(argv):
             track_d0 = infile['tfeatures']['d0'][track_offset+j]
             track_z0 = infile['tfeatures']['z0'][track_offset+j]
             track_q = infile['tfeatures']['q'][track_offset+j]
-            track_cov_d0d0 = infile['tfeatures']['cov_d0d0'][track_offset+j]
-            track_cov_d0z0 = infile['tfeatures']['cov_d0z0'][track_offset+j] #not used
-            track_cov_d0phi = infile['tfeatures']['cov_d0phi'][track_offset+j] #not used
-            track_cov_d0theta = infile['tfeatures']['cov_d0theta'][track_offset+j] #not used
-            track_cov_d0qoverp = infile['tfeatures']['cov_d0qoverp'][track_offset+j] #not used
-            track_cov_z0z0 = infile['tfeatures']['cov_z0z0'][track_offset+j]
-            track_cov_z0phi = infile['tfeatures']['cov_z0phi'][track_offset+j] #not used
-            track_cov_z0theta = infile['tfeatures']['cov_z0theta'][track_offset+j] #not used
-            track_cov_z0qoverp = infile['tfeatures']['cov_z0qoverp'][track_offset+j] #not used
-            track_cov_phiphi = infile['tfeatures']['cov_phiphi'][track_offset+j]
-            track_cov_phitheta = infile['tfeatures']['cov_phitheta'][track_offset+j] #not used
-            track_cov_phiqoverp = infile['tfeatures']['cov_phiqoverp'][track_offset+j] #not used
-            track_cov_thetatheta = infile['tfeatures']['cov_thetatheta'][track_offset+j]
-            track_cov_thetaqoverp = infile['tfeatures']['cov_thetaqoverp'][track_offset+j] #not used
-            track_cov_qoverpqoverp = infile['tfeatures']['cov_qoverpqoverp'][track_offset+j] #not used
+            if incl_errors:
+                track_cov_d0d0 = infile['tfeatures']['cov_d0d0'][track_offset+j]
+                track_cov_z0z0 = infile['tfeatures']['cov_z0z0'][track_offset+j]
+                track_cov_phiphi = infile['tfeatures']['cov_phiphi'][track_offset+j]
+                track_cov_thetatheta = infile['tfeatures']['cov_thetatheta'][track_offset+j]
+                track_cov_qoverpqoverp = infile['tfeatures']['cov_qoverpqoverp'][track_offset+j]
+            if incl_corr:
+                track_cov_d0z0 = infile['tfeatures']['cov_d0z0'][track_offset+j]
+                track_cov_d0phi = infile['tfeatures']['cov_d0phi'][track_offset+j]
+                track_cov_d0theta = infile['tfeatures']['cov_d0theta'][track_offset+j]
+                track_cov_d0qoverp = infile['tfeatures']['cov_d0qoverp'][track_offset+j]
+                track_cov_z0phi = infile['tfeatures']['cov_z0phi'][track_offset+j]
+                track_cov_z0theta = infile['tfeatures']['cov_z0theta'][track_offset+j]
+                track_cov_z0qoverp = infile['tfeatures']['cov_z0qoverp'][track_offset+j]
+                track_cov_phitheta = infile['tfeatures']['cov_phitheta'][track_offset+j]
+                track_cov_phiqoverp = infile['tfeatures']['cov_phiqoverp'][track_offset+j]
+                track_cov_thetaqoverp = infile['tfeatures']['cov_thetaqoverp'][track_offset+j]
+            if incl_hits:
+                track_nPixHits = infile['tfeatures']['nPixHits'][track_offset+j]
+                track_nSCTHits = infile['tfeatures']['nSCTHits'][track_offset+j]
+                track_nBLHits = infile['tfeatures']['nBLHits'][track_offset+j]
+                track_nPixHoles = infile['tfeatures']['nPixHoles'][track_offset+j]
+                track_nSCTHoles = infile['tfeatures']['nSCTHoles'][track_offset+j]
+                track_nPixShared = infile['tfeatures']['nPixShared'][track_offset+j]
+                track_nSCTShared = infile['tfeatures']['nSCTShared'][track_offset+j]
+                track_nBLShared = infile['tfeatures']['nBLShared'][track_offset+j]
+                track_nPixSplit = infile['tfeatures']['nPixSplit'][track_offset+j]
+                track_nBLSplit = infile['tfeatures']['nBLSplit'][track_offset+j]
 
             track_algo = infile['labels']['algo'][track_offset+j]
 
@@ -121,7 +138,19 @@ def main(argv):
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
             second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
-            node_features[j] = [track_pt, track_theta, track_cov_thetatheta, track_phi, track_cov_phiphi, track_d0, track_cov_d0d0, track_z0, track_cov_z0z0, track_q, jet_pt, jet_eta, jet_phi]
+
+            node_features[j][:nnfeatures_base] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
+            offset = nnfeatures_base
+
+            if incl_errors:
+                node_features[j][offset:offset+nnfeatures_errors] = [track_cov_qoverpqoverp, track_cov_thetatheta, track_cov_phiphi, track_cov_d0d0, track_cov_z0z0]
+                offset += nnfeatures_errors
+            if incl_corr:
+                node_features[j][offset:offset+nnfeatures_corrs] = [track_cov_d0z0, track_cov_d0phi, track_cov_d0theta, track_cov_d0qoverp, track_cov_z0phi, track_cov_z0theta, track_cov_z0qoverp, track_cov_phitheta, track_cov_phiqoverp, track_cov_thetaqoverp]
+                offset += nnfeatures_corrs
+            if incl_hits:
+                node_features[j][offset:offset+nnfeatures_hits] = [track_nPixHits, track_nSCTHits, track_nBLHits, track_nPixHoles, track_nSCTHoles, track_nPixShared, track_nSCTShared, track_nBLShared, track_nPixSplit, track_nBLSplit]
+
             node_info[j] = [0, current_event, current_jet]
             reco_labels[j] = [(track_algo & 1 << 2)/4, (track_algo & 1 << 3)/8]
 
@@ -130,12 +159,11 @@ def main(argv):
         #calculate edge features and truth labels
         counter = 0
         for j in range(ntracks):
-
             for k in range(j+1, ntracks):
                 
-                #edge features - NOT CURRENTLY USED
-                delta_pt = abs(node_features[j][0] - node_features[k][0])
-                edge_features[counter:counter+2] = [delta_pt]
+                #set edge features
+                #delta_pt = abs(node_features[j][0] - node_features[k][0])
+                #edge_features[counter:counter+2] = [delta_pt]
 
                 #truth labels - vertices have to share the same HF ancestor
                 if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 1 and flavors[k] == 1: #matching direct ancestors for non secondaries (B to B)

@@ -4,6 +4,7 @@
 
 from GNN_model import *
 from GNN_eval import *
+import options
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -15,37 +16,11 @@ import os,sys,math,glob,time
 import numpy as np
 import argparse
 import ROOT
-from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas
+from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile
 import matplotlib.pyplot as plt
 
 #th.set_printoptions(edgeitems=10000)
-np.set_printoptions(threshold=sys.maxsize)
-
-
-#############################################SCRIPT PARAMS#################################################
-
-#training parameters
-batch_size = 10000 #number of jets in a single training batch
-
-#model parameters
-attention_heads = 1 #number of attention heads in GAT layer -> these are averaged over
-in_features = 13 #number of unique features per node
-nodemlp_sizes = [in_features, 40]
-gat_sizes = [in_features, 128, 256]
-edgemlp_sizes = [2*(gat_sizes[-1]+nodemlp_sizes[-1]), 256, 128, 64] #excluding output features
-
-#script options
-reweight = True #reweight positive labels in loss to make positives and negatives equally important
-load_checkpoint = True
-use_lr_scheduler = True
-multi_class = False
-
-#bad jet criteria for each category
-mult_threshold = [0.5, 0.1, 0.1, 0.7, 0.1] #0, 1, 2, 3, 4 (none, b, c, b->c, other)
-bin_threshold = [0.5, 0.7] #False, True
-score_threshold = 0.6 #threshold for two edges to be able to be associated
-
-###########################################################################################################
+#np.set_printoptions(threshold=sys.maxsize)
 
 
 def main(argv):
@@ -54,21 +29,38 @@ def main(argv):
     #parse command line arguments
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-r", "--runnumber", type=str, default=0, dest="runnumber", help="unique identifier for current run")
-    parser.add_argument("-l", "--lr", type=float, default=0.001, dest="learning_rate", help="learning rate for training")
     parser.add_argument("-e", "--epochs", type=int, default=20, dest="nepochs", help="number of epochs for training")
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
     parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
+    parser.add_argument("-m", "--multiclass", type=int, default=0, dest="multi_class", help="choose whether to perform binary of multi-class classification")
     args = parser.parse_args()
 
     runnumber = args.runnumber
-    learning_rate = args.learning_rate
     nepochs = args.nepochs
     infile_name = args.infile_name
     infile_path = args.data_dir
     outfile_path = args.output_dir
     use_normed = args.use_normed
+    multi_class = args.multi_class
+
+    #import options from option file
+    learning_rate = options.learning_rate
+    batch_size = options.batch_size
+    attention_heads = options.attention_heads
+    in_features = options.nnfeatures_base + int(options.incl_errors)*options.nnfeatures_errors + int(options.incl_corr)*options.nnfeatures_corrs + int(options.incl_hits)*options.nnfeatures_hits
+    nodemlp_sizes = options.nodemlp_sizes
+    gat_sizes = options.gat_sizes
+    edgemlp_sizes = options.edgemlp_sizes
+    reweight = options.reweight #reweight positive labels in loss to make positives and negatives equally important
+    load_checkpoint = options.load_checkpoint
+    use_lr_scheduler = options.use_lr_scheduler
+    mult_threshold = options.mult_threshold
+    bin_threshold = options.bin_threshold
+    score_threshold = options.score_threshold
+
+    #-------------------------------------------------PRE-PROCESSING------------------------------------------------
 
     print("Importing input data.")
     start_time = time.time()
@@ -107,7 +99,7 @@ def main(argv):
     print("Finished importing input data. Time elapsed: {}s.\n".format(p_time))
 
     #reweight positive labels automatically if desired
-    if reweight:
+    if reweight and truth_frac:
         pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
         mult_weights = th.tensor([1./(1-b_frac-c_frac-btoc_frac-o_frac), 1./b_frac, 1./c_frac, 1./btoc_frac, 1./o_frac])
         print("Setting positive weight to {}".format(pos_weight))
@@ -135,7 +127,7 @@ def main(argv):
         activation = nn.Softmax(dim=1)
         labeltype = 'mult_labels'
 
-    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, outfeats, attention_heads).double().to(device)
+    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
         
@@ -157,6 +149,8 @@ def main(argv):
         print("Loading previous model. Starting from epoch {}.".format(start_epoch))
     else:
         start_epoch = 1
+
+    #----------------------------------------------------TRAINING---------------------------------------------------
 
     #main training loop
     t_time = time.time()-start_time
@@ -236,43 +230,40 @@ def main(argv):
         print('Time elapsed: {}s.\n'.format(e_time))
 
     print("Training finished. Evaluating model.\n")
-    
+
+    #---------------------------------------------------EVALUATION--------------------------------------------------
+
+    #create and group histograms
     registerfile = open(registerfile_name, "w")
+    bin_edges = np.linspace(-0.05,1.05,12)
     if not multi_class:
-        pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Entries",10,0,1.001) #1.001 is the upper bound so this is inclusive of 1
-        neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Entries",10,0,1.001)
-        edge_score_hist = TH1D("", "Edges scores;Score;Entries",10,0,1.001)
-        sv1_corrp_hist = TH1D("SV1", "Percentage of tracks from true SV in predicted SV;Percentage;Entries",10,-0.001,1.001)
-        sv1_fakep_hist = TH1D("SV1 ", "Percentage of tracks in predicted SV not found in true SV;Percentage;Entries",10,-0.001,1.001)
-        gnn_corrp_hist = TH1D("GNN", "Percentage of tracks from true SV in predicted SV;Percentage;Entries",10,-0.001,1.001)
-        gnn_fakep_hist = TH1D("GNN ", "Percentage of tracks in predicted SV not found in true SV;Percentage;Entries",10,-0.001,1.001)
+        pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Fraction of jets",11,bin_edges) #1.001 is the upper bound so this is inclusive of 1
+        neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
+        edge_score_hist = TH1D("", "Edges scores;Score;Fraction of jets",11,bin_edges)
 
         hist_r_list = [neg_r_hist, pos_r_hist]
         hist_s_list = [edge_score_hist]
-        hist_pc_list = [gnn_corrp_hist, sv1_corrp_hist]
-        hist_pf_list = [gnn_fakep_hist, sv1_fakep_hist]
+
     else:
-        neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Entries",10,0,1.001)
-        b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Entries",10,0,1.001)
-        c_r_hist = TH1D("Class 2 recall", "Results for each jet;Rate;Entries",10,0,1.001)
-        btoc_r_hist = TH1D("Class 3 recall", "Results for each jet;Rate;Entries",10,0,1.001)
-        o_r_hist = TH1D("Class 4 recall", "Results for each jet;Rate;Entries",10,0,1.001)
-        neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Entries",10,0,1.001)
-        b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Entries",10,0,1.001)
-        c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Entries",10,0,1.001)
-        btoc_score_hist = TH1D("Class 3 scores", "Class scores;Score;Entries",10,0,1.001)
-        o_score_hist = TH1D("Class 4 scores", "Class scores;Score;Entries",10,0,1.001)
+        neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
+        b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
+        c_r_hist = TH1D("Class 2 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
+        btoc_r_hist = TH1D("Class 3 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
+        o_r_hist = TH1D("Class 4 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
+        neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
+        b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
+        c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
+        btoc_score_hist = TH1D("Class 3 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
+        o_score_hist = TH1D("Class 4 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
 
         hist_r_list = [neg_r_hist, b_r_hist, c_r_hist, btoc_r_hist, o_r_hist]
         hist_s_list = [neg_score_hist, b_score_hist, c_score_hist, btoc_score_hist, o_score_hist]
 
-    #initialize matrices for overall SV predictions and plots
-    gnn_cm = np.zeros((3,3), dtype=int)
-    sv1_cm = np.zeros((3,3), dtype=int)
-
     #initialize overall bad events matrix
     bad_events = np.empty((0,3), dtype=np.int)
     total_bad = total_jets = 0
+
+    overall_g_list = []
 
     #testing
     model.eval()
@@ -312,32 +303,13 @@ def main(argv):
         test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
         g_test_list = dgl.unbatch(test_batch)
+        overall_g_list.extend(g_test_list)
 
         #evaluate bad events and find secondary vertices
         for g in g_test_list:
             bad_events = evaluate_jet(g, hist_r_list, bad_events, multi_class, bin_threshold, mult_threshold)
             
-            if not multi_class:
-                gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
-                true_vertices = find_vertices_bin(g, 'truth', score_threshold)
-                sv1_vertex = np.argwhere(g.ndata['reco_labels'].cpu().numpy().astype(int)[:,1]).flatten()
-                if sv1_vertex.size > 0: sv1_vertex = [sv1_vertex]
-
-                jet_gnn_cm, gnn_vertex_metrics = compare_vertices(true_vertices, gnn_vertices)
-                jet_sv1_cm, sv1_vertex_metrics = compare_vertices(true_vertices, sv1_vertex)
-                gnn_cm += jet_gnn_cm
-                sv1_cm += jet_sv1_cm
-
-                for vertex_metric in gnn_vertex_metrics:
-                    hist_pc_list[0].Fill(vertex_metric[0])
-                    hist_pf_list[0].Fill(vertex_metric[1])
-
-                for vertex_metric in sv1_vertex_metrics:
-                    hist_pc_list[1].Fill(vertex_metric[0])
-                    hist_pf_list[1].Fill(vertex_metric[1])
-        
         total_jets += len(g_test_list)
-        total_bad += np.shape(bad_events)[0]
 
         if not multi_class:
             cm += evaluate_confusion_bin(true, pred)
@@ -345,48 +317,21 @@ def main(argv):
             cm += evaluate_confusion_mult(true, pred)
 
     #print test results
-    if not multi_class:
-        hist_list_list = [hist_r_list, hist_s_list, hist_pc_list, hist_pf_list]
-        print('\nTesting results:')
-        print('             ||  Pred False  |  Pred True   |')
-        print('---------------------------------------------')
-        print(f'Actual False || {cm[0,0]:12} | {cm[0,1]:12} |')
-        print(f'Actual True  || {cm[1,0]:12} | {cm[1,1]:12} |')
-        print('---------------------------------------------')
-        print('Accuracy: {:.4f}'.format((cm[1,1]+cm[0,0])/(cm[1,1]+cm[0,0]+cm[0,1]+cm[1,0]))) #(tp+tn)/(tp+tn+fp+fn)
-        print('Fake Rate (1-Precision): {:.4f}'.format(1.-cm[1,1]/(cm[1,1]+cm[0,1]))) #1-tp/(tp+fp)
-        print('Efficiency (TPR): {:.4f}'.format(cm[1,1]/(cm[1,1]+cm[1,0]))) #tp/(tp+fn)
-        print('True Negative Rate: {:.4f}'.format(cm[0,0]/(cm[0,0]+cm[0,1]))) #tn/(tn+fp)
-        print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
-        print('Secondary Vertex prediction results per jet (GNN/SV1):')
-        print('             ||  Pred no SV   |   Pred 1 SV   |   Pred >1 SV  |')
-        print('---------------------------------------------------------------')
-        print(f'Actual no SV || {gnn_cm[0,0]:5} /{sv1_cm[0,0]:6} | {gnn_cm[0,1]:5} /{sv1_cm[0,1]:6} | {gnn_cm[0,2]:5} /{sv1_cm[0,2]:6} |')
-        print(f'Actual 1 SV  || {gnn_cm[1,0]:5} /{sv1_cm[1,0]:6} | {gnn_cm[1,1]:5} /{sv1_cm[1,1]:6} | {gnn_cm[1,2]:5} /{sv1_cm[1,2]:6} |')
-        print(f'Actual >1 SV || {gnn_cm[2,0]:5} /{sv1_cm[2,0]:6} | {gnn_cm[2,1]:5} /{sv1_cm[2,1]:6} | {gnn_cm[2,2]:5} /{sv1_cm[2,2]:6} |')
-        print('---------------------------------------------------------------')
-
-    else:
-        hist_list_list = [hist_r_list, hist_s_list]
-        print('\nTesting results:')
-        print('       ||    Pred 0    |    Pred 1    |    Pred 2    |    Pred 3    |    Pred 4    ||  Recall ')
-        print('----------------------------------------------------------------------------------------------')
-        print(f'True 0 || {cm[0,0]:12d} | {cm[0,1]:12d} | {cm[0,2]:12d} | {cm[0,3]:12d} | {cm[0,4]:12d} || {cm[0,0]/(cm[0,0]+cm[0,1]+cm[0,2]+cm[0,3]+cm[0,4]):.4f}')
-        print(f'True 1 || {cm[1,0]:12d} | {cm[1,1]:12d} | {cm[1,2]:12d} | {cm[1,3]:12d} | {cm[1,4]:12d} || {cm[1,1]/(cm[1,0]+cm[1,1]+cm[1,2]+cm[1,3]+cm[1,4]):.4f}')
-        print(f'True 2 || {cm[2,0]:12d} | {cm[2,1]:12d} | {cm[2,2]:12d} | {cm[2,3]:12d} | {cm[2,4]:12d} || {cm[2,2]/(cm[2,0]+cm[2,1]+cm[2,2]+cm[2,3]+cm[2,4]):.4f}')
-        print(f'True 3 || {cm[3,0]:12d} | {cm[3,1]:12d} | {cm[3,2]:12d} | {cm[3,3]:12d} | {cm[3,4]:12d} || {cm[3,3]/(cm[3,0]+cm[3,1]+cm[3,2]+cm[3,3]+cm[3,4]):.4f}')
-        print(f'True 4 || {cm[4,0]:12d} | {cm[4,1]:12d} | {cm[4,2]:12d} | {cm[4,3]:12d} | {cm[4,4]:12d} || {cm[4,4]/(cm[4,0]+cm[4,1]+cm[4,2]+cm[4,3]+cm[4,4]):.4f}')
-        print('----------------------------------------------------------------------------------------------')
-        print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
+    print_output(multi_class, cm)
 
     #sort array with bad events by file, event and jet
     indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
+    total_bad = np.shape(bad_events)[0]
     bad_events = bad_events[indices]
     
     #output bad events to file
     for i in range(total_bad):
         registerfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
-    print("\nMarked {}% of {} jets as bad".format(100*total_bad/total_jets, total_jets))
+    print("Marked {}% of {} jets as bad\n".format(100*total_bad/total_jets, total_jets))
+
+    #save results to file
+    outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
+    dgl.save_graphs(outfile_name+"_results.bin", overall_g_list)
 
     #plot loss
     plt.ioff()
@@ -394,12 +339,12 @@ def main(argv):
     plt.plot(range(nepochs), val_loss_array, label="Validation")
     plt.legend()
     plt.xlabel("Epoch")
-    plt.savefig(outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_lossplot.png")
+    plt.savefig(outfile_name+"_lossplot.png")
 
-    ext = ["_recall.png", "_score.png", "_corr_p.png", "_fake_p.png"]
-    outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
+    ext = ["_recall.png", "_score.png"]
+    hist_list_list = [hist_r_list, hist_s_list]
     for i in range(len(hist_list_list)):
-        plot_hist(hist_list_list[i], outfile_name, ext[i])
+        plot_metric_hist(hist_list_list[i], outfile_name, ext[i])
 
 
 if __name__ == '__main__':

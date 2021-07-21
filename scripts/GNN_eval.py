@@ -142,7 +142,7 @@ def compare_vertices(true_vertices, reco_vertices):
 
     vertex_cm = np.zeros((3,3), dtype=int) #no sv, one sv, more than one sv (first index = true, second index = predicted)
     vertex_metrics = []
-    vertex_assoc = np.empty(len(true_vertices))
+    vertex_assoc = np.empty(len(true_vertices), dtype=int)
     vertex_assoc.fill(-1) #true vertices with -1 have no reco association
 
     #count how many jets were correctly identified as containing an SV
@@ -183,10 +183,10 @@ def compare_vertices(true_vertices, reco_vertices):
             correct_tracks = np.intersect1d(reco_vertices[reco_index], true_vertices[i])
             vertex_metrics.append([correct_tracks.size/true_vertices[i].size, (reco_vertices[reco_index].size-correct_tracks.size)/reco_vertices[reco_index].size])
 
-    return vertex_cm, vertex_metrics
+    return vertex_cm, vertex_metrics, vertex_assoc
 
 
-def output_performance(multi_class):
+def print_output(multi_class, cm):
     if not multi_class:
         print('\nTesting results:')
         print('             ||  Pred False  |  Pred True   |')
@@ -199,7 +199,6 @@ def output_performance(multi_class):
         print('Efficiency (TPR): {:.4f}'.format(cm[1,1]/(cm[1,1]+cm[1,0]))) #tp/(tp+fn)
         print('True Negative Rate: {:.4f}'.format(cm[0,0]/(cm[0,0]+cm[0,1]))) #tn/(tn+fp)
         print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
-
     else:
         print('\nTesting results:')
         print('       ||    Pred 0    |    Pred 1    |    Pred 2    |    Pred 3    |    Pred 4    ||  Recall ')
@@ -213,19 +212,42 @@ def output_performance(multi_class):
         print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
 
 
-def plot_hist(hist_list, outfile_name, ext):
+def plot_metric_hist(hist_list, outfile_name, ext):
     canv1 = TCanvas("c1", "c1", 800, 600)
+    canv1.SetGrid()
     colorlist = [1,4,8,2,6]
     gStyle.SetOptStat(0)
     legend = TLegend(0.78,0.95-0.1*max(len(hist_list),2),0.98,0.95)
+
     for i in range(len(hist_list)):
         legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(hist_list[i].GetName(), hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
         hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
         hist_list[i].SetLineWidth(3)
-        if hist_list[i].Integral(): hist_list[i].Scale(1./hist_list[i].Integral(), "width")
-        hist_list[i].SetMaximum(12)
+        if hist_list[i].GetEntries(): hist_list[i].Scale(1./(hist_list[i].GetEntries()))
+        hist_list[i].SetMaximum(1.2)
         if i == 0: hist_list[i].Draw()
-        else: hist_list[i].Draw("SAMES")
+        else:hist_list[i].Draw("SAMES")
+    legend.SetTextSize(0.025)
+    legend.Draw("SAME")
+    canv1.SaveAs(outfile_name+ext)
+    canv1.Clear()
+
+
+def plot_profile(profile_list, outfile_name, labels, ylimit, ext):
+    canv1 = TCanvas("c1", "c1", 800, 600)
+    canv1.SetGrid()
+    colorlist = [1,4,8,2,6]
+    gStyle.SetOptStat(0)
+    legend = TLegend(0.78,0.95-0.1*max(len(profile_list),2),0.98,0.95)
+
+    for i in range(len(profile_list)):
+        legend.AddEntry(profile_list[i], "#splitline{%s}{#splitline{%d entries}{y-mean=%.2f}}"%(labels[i], profile_list[i].GetEntries(), profile_list[i].GetMean(2)), "l")
+        profile_list[i].SetLineColorAlpha(colorlist[i],0.65)
+        profile_list[i].SetLineWidth(3)
+        profile_list[i].SetMaximum(ylimit[1])
+        profile_list[i].SetMinimum(ylimit[0])
+        if i == 0: profile_list[i].Draw()
+        else:profile_list[i].Draw("SAMES")
     legend.SetTextSize(0.025)
     legend.Draw("SAME")
     canv1.SaveAs(outfile_name+ext)

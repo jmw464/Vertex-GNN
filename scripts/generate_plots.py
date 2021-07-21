@@ -7,22 +7,13 @@ from ROOT import TFile, TH1D, TH1I, gROOT, TCanvas, gPad, TLegend
 import time
 
 from truth import *
+import options
 
-#############################################SCRIPT PARAMS#################################################
-
-remove_pv = True
-
-jet_pt_cut = 20000 #20 GeV
-jet_eta_cut = 2.5 #edge of detector
-track_pt_cut = 650 #600 MeV
-track_eta_cut = 2.5 #edge of detector
-track_z0_cut = 20
-
-###########################################################################################################
 
 #plot list of histograms with specified labels
 def plot_hist(canv, histlist, labellist, norm, filename, options, overflow):
     gPad.SetLogy()
+    canv.SetGrid()
     legend = TLegend(0.78,0.95-0.1*len(histlist),0.98,0.95)
     colorlist = [4, 8, 2, 6, 1]
     if options: same = "SAMES "
@@ -34,7 +25,7 @@ def plot_hist(canv, histlist, labellist, norm, filename, options, overflow):
         histlist[i].SetLineWidth(3)
         nbins = histlist[i].GetNbinsX()
         if overflow: histlist[i].SetBinContent(nbins, histlist[i].GetBinContent(nbins) + histlist[i].GetBinContent(nbins+1))
-        if entries and norm: histlist[i].Scale(1./histlist[i].Integral(), "width")
+        if entries and norm: histlist[i].Scale(1./entries)
         if i == 0: histlist[i].Draw(options)
         else: histlist[i].Draw(same+options)
         legend.AddEntry(histlist[i], "#splitline{"+labellist[i]+"}{#splitline{%d entries}{mean=%.2f}}"%(entries, mean), "l")
@@ -66,14 +57,23 @@ def main(argv):
     savepath = args.output_dir
     only_bad_events = args.only_bad_events
     data_dir = args.data_dir
+
+    #import options from option file
+    remove_pv = options.remove_pv
+    jet_pt_cut = options.jet_pt_cut
+    jet_eta_cut = options.jet_eta_cut
+    track_pt_cut = options.track_pt_cut
+    track_eta_cut = options.track_eta_cut
+    track_z0_cut = options.track_z0_cut
   
     ntuples = args.ntuples.split()
     ntuples.sort()
 
     #association criteria are being the direct descendant (max one level removed) of a HF hadron that spawned a track
-    hist_no_char_b = TH1D("no_char_b", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
-    hist_no_char_c = TH1D("no_char_c", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
-    hist_no_char_btoc = TH1D("no_char_btoc", "Number of charged particle children per vertex;Number of particles;Normalized entries", 10, 0, 10)
+    bin_edges = np.linspace(-0.5,10.5,12)
+    hist_no_char_b = TH1D("no_char_b", "Number of charged particle children per vertex;Number of particles;Normalized entries", 11, bin_edges)
+    hist_no_char_c = TH1D("no_char_c", "Number of charged particle children per vertex;Number of particles;Normalized entries", 11, bin_edges)
+    hist_no_char_btoc = TH1D("no_char_btoc", "Number of charged particle children per vertex;Number of particles;Normalized entries", 11, bin_edges)
     
     hist_fl_len_b = TH1D("fl_len_b", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 1)
     hist_fl_len_c = TH1D("fl_len_c", "Distance between HF hadron decay vertex and track vertex;Distance [mm];Entries", 20, 0, 1)
@@ -83,8 +83,9 @@ def main(argv):
     hist_trk_vtx_dist_c = TH1D("trk_vtx_dist_c", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 1)
     hist_trk_vtx_dist_btoc = TH1D("trk_vtx_dist_btoc", "Distance between track PVs within SV;Distance [mm];Entries", 20, 0, 1)
 
-    hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
-    hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 15, 0, 30)
+    bin_edges = np.linspace(-1.0,31.0,17)
+    hist_no_trk_acc = TH1D("no_trk_acc", "Number of tracks per jet;Number of tracks;Entries", 16, bin_edges)
+    hist_no_trk_rej = TH1D("no_trk_rej", "Number of tracks per jet;Number of tracks;Entries", 16, bin_edges)
 
     hist_trk_pt_b = TH1D("trk_pt_b", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
     hist_trk_pt_c = TH1D("trk_pt_c", "Track pT;pT [MeV];Normalized entries", 20, 0, 30000)
@@ -111,15 +112,17 @@ def main(argv):
     hist_trk_z0_btoc = TH1D("trk_z0_btoc", "Track z0;z0 [cm];Normalized entries", 20, -25, 25)
 
     #association criteria are being the most recent HF antecedant of a track particle (not necessarily only one level removed)
-    hist_no_trk_b = TH1D("no_trk_b", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
-    hist_no_trk_c = TH1D("no_trk_c", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
+    bin_edges = np.linspace(-0.5,10.5,12)
+    hist_no_trk_b = TH1D("no_trk_b", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_c = TH1D("no_trk_c", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 11, bin_edges)
     hist_no_trk_btoc = TH1D("no_trk_btoc", "Number of associated tracks per vertex;Number of tracks;Normalized entries", 10, 0, 10)
 
-    hist_no_trk_jet_b = TH1D("no_trk_jet_b", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
-    hist_no_trk_jet_c = TH1D("no_trk_jet_c", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
-    hist_no_trk_jet_btoc = TH1D("no_trk_jet_btoc", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
-    hist_no_trk_jet_o = TH1D("no_trk_jet_o", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
-    hist_no_trk_jet_nm = TH1D("no_trk_jet_nm", "Number of associated tracks per jet;Number of tracks;Normalized entries", 10, 0, 10)
+    bin_edges = np.linspace(-0.05,1.05,12)
+    hist_no_trk_jet_b = TH1D("no_trk_jet_b", "Number of associated tracks per jet;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_jet_c = TH1D("no_trk_jet_c", "Number of associated tracks per jet;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_jet_btoc = TH1D("no_trk_jet_btoc", "Number of associated tracks per jet;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_jet_o = TH1D("no_trk_jet_o", "Number of associated tracks per jet;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_jet_nm = TH1D("no_trk_jet_nm", "Number of associated tracks per jet;Number of tracks;Normalized entries", 11, bin_edges)
 
     hist_frac_trk_b = TH1D("frac_trk_b", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)
     hist_frac_trk_c = TH1D("frac_trk_c", "Fraction of tracks per jet;Track fraction;Entries", 10, 0, 1)

@@ -8,17 +8,19 @@ import dgl.function as fn
 
 class GCN(nn.Module):
 
-    def __init__(self, gnn_size, attn_heads):
+    def __init__(self, gnn_size, in_features, attn_heads):
         super(GCN, self).__init__()
-        self.conv1 = dglnn.GATConv(gnn_size[0], gnn_size[1], attn_heads)
-        self.conv2 = dglnn.GATConv(gnn_size[1], gnn_size[2], attn_heads)
+        self.conv1 = dglnn.GATConv(in_features, gnn_size[0], attn_heads)
+        self.conv2 = dglnn.GATConv(gnn_size[0], gnn_size[1], attn_heads)
 
     def forward(self, g, x):
         # inputs are features of nodes
         h = self.conv1(g, x)
+        #h = th.flatten(h, start_dim=1, end_dim=2)
         h = th.mean(h,1)
         h = nn.functional.relu(h)
         h = self.conv2(g, h)
+        #h = th.flatten(h, start_dim=1, end_dim=2)
         h = th.mean(h,1)
         h = nn.functional.relu(h)
         return h
@@ -26,24 +28,28 @@ class GCN(nn.Module):
 
 class NodeMLP(nn.Module):
     
-    def __init__(self, nodemlp_size):
+    def __init__(self, nodemlp_size, in_features):
         super().__init__()
-        self.lin1 = nn.Linear(nodemlp_size[0], nodemlp_size[1])
-    
+        self.lin1 = nn.Linear(in_features, nodemlp_size[0])
+        self.lin2 = nn.Linear(nodemlp_size[0], nodemlp_size[1])
+
     def forward(self, h):
         h = self.lin1(h)
+        h = nn.functional.relu(h)
+        h = self.lin2(h)
         h = nn.functional.relu(h)
         return h
 
 
 class EdgeMLP(nn.Module):
     
-    def __init__(self, edgemlp_size, out_features):
+    def __init__(self, edgemlp_size, in_features, out_features):
         super().__init__()
-        self.lin1 = nn.Linear(edgemlp_size[0], edgemlp_size[1])
-        self.lin2 = nn.Linear(edgemlp_size[1], edgemlp_size[2])
-        self.lin3 = nn.Linear(edgemlp_size[2], edgemlp_size[3])
-        self.lin4 = nn.Linear(edgemlp_size[3], out_features)
+        self.lin1 = nn.Linear(in_features, edgemlp_size[0])
+        self.lin2 = nn.Linear(edgemlp_size[0], edgemlp_size[1])
+        self.lin3 = nn.Linear(edgemlp_size[1], edgemlp_size[2])
+        self.lin4 = nn.Linear(edgemlp_size[2], edgemlp_size[3])
+        self.lin5 = nn.Linear(edgemlp_size[3], out_features)
     
     def apply_edges(self, edges):
         h1_u = edges.src['h1']
@@ -58,6 +64,8 @@ class EdgeMLP(nn.Module):
         h = self.lin3(h)
         h = th.sigmoid(h)
         h = self.lin4(h)
+        h = th.sigmoid(h)
+        h = self.lin5(h)
         return {'score': h}
     
     def forward(self, g, h1, h2):
@@ -79,11 +87,11 @@ class DotProductPredictor(nn.Module):
 
 class EdgePredModel(nn.Module):
     
-    def __init__(self, nodemlp_size, gnn_size, edgemlp_size, out_features, attn_heads):
+    def __init__(self, nodemlp_size, gnn_size, edgemlp_size, in_features, out_features, attn_heads):
         super().__init__()
-        self.nodemlp = NodeMLP(nodemlp_size)
-        self.gcn = GCN(gnn_size, attn_heads)
-        self.edgemlp = EdgeMLP(edgemlp_size, out_features)
+        self.nodemlp = NodeMLP(nodemlp_size, in_features)
+        self.gcn = GCN(gnn_size, in_features, attn_heads)
+        self.edgemlp = EdgeMLP(edgemlp_size, 2*(gnn_size[-1]+nodemlp_size[-1]), out_features)
     
     def forward(self, g, x):
         h1 = self.nodemlp(x)
