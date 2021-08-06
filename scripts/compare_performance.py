@@ -12,6 +12,7 @@ import ROOT
 from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile, gPad
 
 from GNN_eval import *
+from plot_functions import *
 import options
 
 
@@ -35,7 +36,6 @@ def main(argv):
 
     #import options from option file
     batch_size = options.batch_size
-    in_features = options.nnfeatures_base + int(options.incl_errors)*options.nnfeatures_errors + int(options.incl_corr)*options.nnfeatures_corrs + int(options.incl_hits)*options.nnfeatures_hits
     score_threshold = options.score_threshold
     jet_pt_bound = options.jet_pt_bound
     jet_eta_bound = options.jet_eta_bound
@@ -44,7 +44,25 @@ def main(argv):
     paramfile_name = infile_path+infile_name+"_params"
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
     normfile_name = infile_path+infile_name+"_norm"
-	
+
+    #calculate number of features in graphs
+    sample_graph = (dgl.load_graphs(graphfile_name, [0]))[0][0]
+    incl_errors = incl_corr = incl_hits = False
+    nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
+    nnfeatures = nnfeatures_base
+    if 'features_errors' in sample_graph.ndata.keys():
+        nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
+        incl_errors = True
+        nnfeatures += nnfeatures_errors
+    if 'features_hits' in sample_graph.ndata.keys():
+        nnfeatures_hits = sample_graph.ndata['features_hits'].size()[1]
+        incl_hits = True
+        nnfeatures += nnfeatures_hits
+    if 'features_corr' in sample_graph.ndata.keys():
+        nnfeatures_corr = sample_graph.ndata['features_corr'].size()[1]
+        incl_corr = True
+        nnfeatures += nnfeatures_corr
+
     #read in length of test file
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
@@ -142,8 +160,8 @@ def main(argv):
             gnn_cm += jet_gnn_cm
             sv1_cm += jet_sv1_cm
 
-            jet_pt = g.ndata['features'][0,5]
-            jet_eta = g.ndata['features'][0,6]
+            jet_pt = g.ndata['features_base'][0,5]
+            jet_eta = g.ndata['features_base'][0,6]
             if norm:
                 jet_pt = jet_pt*jet_pt_std+jet_pt_mean
                 jet_eta = jet_eta*jet_eta_std+jet_eta_mean
@@ -176,6 +194,7 @@ def main(argv):
                         gnn_eta_profile_fakep_b.Fill(jet_eta, gnn_vertex_metrics[index][1]) 
 
                 if sv1_vertex_assoc[i] >= 0:
+                    index = sv1_vertex_assoc[i]
                     if vertex_flavor == 2:
                         sv1_pt_profile_corrp_c.Fill(jet_pt, sv1_vertex_metrics[index][0])
                         sv1_pt_profile_fakep_c.Fill(jet_pt, sv1_vertex_metrics[index][1])
@@ -245,25 +264,26 @@ def main(argv):
     canv1.Clear()
     del canv1
 
-    plot_profile([sv1_pt_profile_eff_c, gnn_pt_profile_eff_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_eff_pt_c.png")
-    plot_profile([sv1_pt_profile_eff_b, gnn_pt_profile_eff_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_eff_pt_b.png")
-    plot_profile([sv1_eta_profile_eff_c, gnn_eta_profile_eff_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_eff_eta_c.png")
-    plot_profile([sv1_eta_profile_eff_b, gnn_eta_profile_eff_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_eff_eta_b.png")
-    plot_profile([sv1_pt_profile_fr, gnn_pt_profile_fr], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fr_pt.png")
-    plot_profile([sv1_eta_profile_fr, gnn_eta_profile_fr], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fr_eta.png")
-    plot_profile([sv1_pt_profile_corrp_c, gnn_pt_profile_corrp_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_corrp_pt_c.png")
-    plot_profile([sv1_pt_profile_corrp_b, gnn_pt_profile_corrp_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_corrp_pt_b.png")
-    plot_profile([sv1_eta_profile_corrp_c, gnn_eta_profile_corrp_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_corrp_eta_c.png")
-    plot_profile([sv1_eta_profile_corrp_b, gnn_eta_profile_corrp_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_corrp_eta_b.png")
-    plot_profile([sv1_pt_profile_fakep_c, gnn_pt_profile_fakep_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fakep_pt_c.png")
-    plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fakep_pt_b.png")
-    plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fakep_eta_c.png")
-    plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], outfile_name, ["SV1", "GNN"], [0.0, 1.2], "_fakep_eta_b.png")
+    plot_profile([sv1_pt_profile_eff_c, gnn_pt_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_c.png")
+    plot_profile([sv1_pt_profile_eff_b, gnn_pt_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_b.png")
+    plot_profile([sv1_eta_profile_eff_c, gnn_eta_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_eta_c.png")
+    plot_profile([sv1_eta_profile_eff_b, gnn_eta_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_eta_b.png")
+    plot_profile([sv1_pt_profile_fr, gnn_pt_profile_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fr_pt.png")
+    plot_profile([sv1_eta_profile_fr, gnn_eta_profile_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fr_eta.png")
+    plot_profile([sv1_pt_profile_corrp_c, gnn_pt_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_c.png")
+    plot_profile([sv1_pt_profile_corrp_b, gnn_pt_profile_corrp_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_b.png")
+    plot_profile([sv1_eta_profile_corrp_c, gnn_eta_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_eta_c.png")
+    plot_profile([sv1_eta_profile_corrp_b, gnn_eta_profile_corrp_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_eta_b.png")
+    plot_profile([sv1_pt_profile_fakep_c, gnn_pt_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_c.png")
+    plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_b.png")
+    plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_c.png")
+    plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_b.png")
 
-    ext = ["_corr_p.png", "_fake_p.png"]
+    ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]
     for i in range(len(hist_list_list)):
-        plot_metric_hist(hist_list_list[i], outfile_name, ext[i])
+        plot_metric_hist(hist_list_list[i], [0.0,1.4], outfile_name+ext[i])
+
 
 if __name__ == '__main__':
     main(sys.argv)

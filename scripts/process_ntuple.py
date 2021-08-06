@@ -6,7 +6,7 @@ import h5py
 import argparse
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas, TTree
 
-from truth import *
+from truth_functions import *
 import options
 
 
@@ -39,16 +39,19 @@ def main(argv):
     incl_corr = options.incl_corr
     incl_hits = options.incl_hits
     
+    #general jet info
     info = dict()
     info['event'] = []
     info['jet'] = []
     info['ntracks'] = []
 
+    #jet features
     jfeatures = dict()
     jfeatures['pt'] = []
     jfeatures['eta'] = []
     jfeatures['phi'] = []
 
+    #track features
     tfeatures = dict()
     tfeatures['pt'] = []
     tfeatures['eta'] = []
@@ -86,29 +89,28 @@ def main(argv):
         tfeatures['nPixSplit'] = []
         tfeatures['nBLSplit'] = []
 
+    #event features
     efeatures = dict()
     efeatures['event_vx'] = []
     efeatures['event_vy'] = []
     efeatures['event_vz'] = []
 
+    #track labels and truth info
     labels = dict()
-    labels['ancestor'] = []
-    labels['flavor'] = []
-    labels['second_ancestor'] = [] #only gets determined for B->C tracks
-    labels['algo'] = []
+    labels['ancestor'] = [] #ID of HF ancestor
+    labels['flavor'] = [] #track flavor label
+    labels['second_ancestor'] = [] #ID of second HF ancestor (only gets determined for B->C tracks)
+    labels['algo'] = [] #track association with reco algorithms
 
-    total_rem_tracks = 0
-    total_tracks = 0
-    total_jets = 0
-    total_rem_jets = 0
+    total_rem_tracks = total_tracks = total_jets = total_rem_jets = 0
 
+    #process entries
     for ientry,entry in enumerate(tree):
-
         njets = entry.njets
         rem_jets = 0
         
-        #check event to see if it can be skipped
-        event_pass = False
+        #check event to see which jets can be skipped entirely
+        passed_jets = []
         for i in range(njets):
             if check_jet(entry, i, jet_pt_cut, jet_eta_cut):
                 rem_trk = 0
@@ -117,71 +119,66 @@ def main(argv):
                     if check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut) and (not remove_pv or not entry.jet_trk_isPV_reco[i][j]):
                         rem_trk += 1
                 if rem_trk > 1:
-                    event_pass = True
-        if not event_pass:
+                    passed_jets.append(i)
+        if not len(passed_jets):
             continue
         
         particle_dict = build_particle_dict(entry)
         primary_vertex = np.array([entry.truth_PVx, entry.truth_PVy, entry.truth_PVz])
 
         for i in range(njets):
-            ntracks = entry.jet_trk_pt[i].size()
-            t_pt = []
-            t_eta = []
-            t_theta = []
-            t_phi = []
-            t_d0 = []
-            t_z0 = []
-            t_q = []
-            if incl_errors:
-                t_cov_d0d0 = []
-                t_cov_z0z0 = []
-                t_cov_phiphi = []
-                t_cov_thetatheta = []
-                t_cov_qoverpqoverp = []
-            if incl_corr:
-                t_cov_d0z0 = []
-                t_cov_d0phi = []
-                t_cov_d0theta = []
-                t_cov_d0qoverp = []
-                t_cov_z0phi = []
-                t_cov_z0theta = []
-                t_cov_z0qoverp = []
-                t_cov_phitheta = []
-                t_cov_phiqoverp = []
-                t_cov_thetaqoverp = []
-            if incl_hits:
-                t_nPixHits = []
-                t_nSCTHits = []
-                t_nBLHits = []
-                t_nPixHoles = []
-                t_nSCTHoles = []
-                t_nPixShared = []
-                t_nSCTShared = []
-                t_nBLShared = []
-                t_nPixSplit = []
-                t_nBLSplit = []
-            t_ancestor = []
-            t_second_ancestor = []
-            t_flavor = []
-            t_algo = []
-
             total_jets += 1
 
-            if check_jet(entry, i, jet_pt_cut, jet_eta_cut):    
-                #count tracks that pass cuts to know which jets to skip entirely
+            if i in passed_jets:
+                ntracks = entry.jet_trk_pt[i].size()
                 rem_trk = 0
-                for j in range(ntracks):
-                    if (not remove_pv or not entry.jet_trk_isPV_reco[i][j]) and check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut):
-                        rem_trk += 1
-                if rem_trk <= 1:
-                    continue
-                else:
-                    total_rem_tracks += rem_trk
+
+                t_pt = []
+                t_eta = []
+                t_theta = []
+                t_phi = []
+                t_d0 = []
+                t_z0 = []
+                t_q = []
+                if incl_errors:
+                    t_cov_d0d0 = []
+                    t_cov_z0z0 = []
+                    t_cov_phiphi = []
+                    t_cov_thetatheta = []
+                    t_cov_qoverpqoverp = []
+                if incl_corr:
+                    t_cov_d0z0 = []
+                    t_cov_d0phi = []
+                    t_cov_d0theta = []
+                    t_cov_d0qoverp = []
+                    t_cov_z0phi = []
+                    t_cov_z0theta = []
+                    t_cov_z0qoverp = []
+                    t_cov_phitheta = []
+                    t_cov_phiqoverp = []
+                    t_cov_thetaqoverp = []
+                if incl_hits:
+                    t_nPixHits = []
+                    t_nSCTHits = []
+                    t_nBLHits = []
+                    t_nPixHoles = []
+                    t_nSCTHoles = []
+                    t_nPixShared = []
+                    t_nSCTShared = []
+                    t_nBLShared = []
+                    t_nPixSplit = []
+                    t_nBLSplit = []
+
+                t_ancestor = []
+                t_second_ancestor = []
+                t_flavor = []
+                t_algo = []
                 
                 #save relevant feature information
                 for j in range(ntracks):
                     if not (remove_pv and entry.jet_trk_isPV_reco[i][j]) and check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut):
+                        rem_trk += 1
+
                         t_pt.append(entry.jet_trk_pt[i][j])
                         t_eta.append(entry.jet_trk_eta[i][j])
                         t_theta.append(entry.jet_trk_theta[i][j])
@@ -222,7 +219,7 @@ def main(argv):
                 track_dict, jet_cut_trk = build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut)
                 um_other_tracks = np.array([])
 
-                #make first attempt at track classification (still need to correct some bH labels to bH->cH after this point)
+                #perform track classification
                 for ti in track_dict:
                     t_class = classify_track(ti, particle_dict, track_dict)
                     track_dict[ti].classification = t_class
@@ -245,7 +242,7 @@ def main(argv):
                                 track_dict[tj].hf_ancestor = track_dict[ti].hf_ancestor
                                 um_other_tracks = np.delete(um_other_tracks, np.where(um_other_tracks == tj))
 
-                #fix classifications and save relevant label data
+                #save relevant label data
                 for ti in track_dict:
                     flavor = track_dict[ti].classification
                     if flavor == 'b':
@@ -258,6 +255,8 @@ def main(argv):
                         t_flavor.append(0)
                     t_ancestor.append(track_dict[ti].hf_ancestor)
                     t_second_ancestor.append(track_dict[ti].btoc_ancestor)
+
+                total_rem_tracks += rem_trk
 
                 #write events
                 jfeatures['pt'].append(entry.jet_pt[i])

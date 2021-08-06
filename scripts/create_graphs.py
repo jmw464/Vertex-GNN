@@ -54,8 +54,6 @@ def main(argv):
     incl_hits = options.incl_hits
     incl_btoc = options.incl_btoc
 
-    nnfeatures = nnfeatures_base + int(incl_errors)*nnfeatures_errors + int(incl_corr)*nnfeatures_corrs + int(incl_hits)*nnfeatures_hits
-
     #file names
     infile_name = data_path+data_name+".hdf5"
     outfile_name = data_path+data_name+".bin"
@@ -81,15 +79,19 @@ def main(argv):
         nedges = ntracks*(ntracks-1)
 
         #initialize empty arrays
-        node_features = np.zeros((ntracks,nnfeatures))
+        node_features_base = np.zeros((ntracks,nnfeatures_base))
+        if incl_errors: node_features_errors = np.zeros((ntracks,nnfeatures_errors))
+        if incl_hits: node_features_hits = np.zeros((ntracks,nnfeatures_hits))
+        if incl_corr: node_features_corrs = np.zeros((ntracks,nnfeatures_corrs))
+        #edge_features = np.zeros((nedges,nefeatures)) 
         node_info = np.zeros((ntracks, 3)) #store event info - file (set in combine_graphs.py), event, jet
-        #edge_features = np.zeros((nedges,nefeatures))
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
         flavors = np.zeros((ntracks,1))
+        truth_info = np.zeros((ntracks,3))
         bin_labels = np.zeros((nedges,1))
         mult_labels = np.zeros((nedges,1))
-        reco_labels = np.zeros((ntracks,2))
+        reco_labels = np.zeros((ntracks,2)) #use of track in SV0, SV1
         
         #read in features
         for j in range(ntracks):
@@ -101,11 +103,11 @@ def main(argv):
             track_z0 = infile['tfeatures']['z0'][track_offset+j]
             track_q = infile['tfeatures']['q'][track_offset+j]
             if incl_errors:
-                track_cov_d0d0 = infile['tfeatures']['cov_d0d0'][track_offset+j]
-                track_cov_z0z0 = infile['tfeatures']['cov_z0z0'][track_offset+j]
-                track_cov_phiphi = infile['tfeatures']['cov_phiphi'][track_offset+j]
-                track_cov_thetatheta = infile['tfeatures']['cov_thetatheta'][track_offset+j]
-                track_cov_qoverpqoverp = infile['tfeatures']['cov_qoverpqoverp'][track_offset+j]
+                track_cov_d0d0 = math.sqrt(infile['tfeatures']['cov_d0d0'][track_offset+j])
+                track_cov_z0z0 = math.sqrt(infile['tfeatures']['cov_z0z0'][track_offset+j])
+                track_cov_phiphi = math.sqrt(infile['tfeatures']['cov_phiphi'][track_offset+j])
+                track_cov_thetatheta = math.sqrt(infile['tfeatures']['cov_thetatheta'][track_offset+j])
+                track_cov_qoverpqoverp = math.sqrt(abs(infile['tfeatures']['cov_qoverpqoverp'][track_offset+j]))
             if incl_corr:
                 track_cov_d0z0 = infile['tfeatures']['cov_d0z0'][track_offset+j]
                 track_cov_d0phi = infile['tfeatures']['cov_d0phi'][track_offset+j]
@@ -138,18 +140,15 @@ def main(argv):
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
             second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
+            truth_info[j] = [ancestors[j], second_ancestors[j], flavors[j]]
 
-            node_features[j][:nnfeatures_base] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
-            offset = nnfeatures_base
-
+            node_features_base[j] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
             if incl_errors:
-                node_features[j][offset:offset+nnfeatures_errors] = [track_cov_qoverpqoverp, track_cov_thetatheta, track_cov_phiphi, track_cov_d0d0, track_cov_z0z0]
-                offset += nnfeatures_errors
+                node_features_errors[j] = [track_cov_qoverpqoverp, track_cov_thetatheta, track_cov_phiphi, track_cov_d0d0, track_cov_z0z0]
             if incl_corr:
-                node_features[j][offset:offset+nnfeatures_corrs] = [track_cov_d0z0, track_cov_d0phi, track_cov_d0theta, track_cov_d0qoverp, track_cov_z0phi, track_cov_z0theta, track_cov_z0qoverp, track_cov_phitheta, track_cov_phiqoverp, track_cov_thetaqoverp]
-                offset += nnfeatures_corrs
+                node_features_corrs[j] = [track_cov_thetaqoverp, track_cov_phiqoverp, track_cov_d0qoverp, track_cov_z0qoverp, track_cov_phitheta, track_cov_d0theta, track_cov_z0theta, track_cov_d0phi, track_cov_z0phi, track_cov_d0z0]
             if incl_hits:
-                node_features[j][offset:offset+nnfeatures_hits] = [track_nPixHits, track_nSCTHits, track_nBLHits, track_nPixHoles, track_nSCTHoles, track_nPixShared, track_nSCTShared, track_nBLShared, track_nPixSplit, track_nBLSplit]
+                node_features_hits[j] = [track_nPixHits, track_nSCTHits, track_nBLHits, track_nPixHoles, track_nSCTHoles, track_nPixShared, track_nSCTShared, track_nBLShared, track_nPixSplit, track_nBLSplit]
 
             node_info[j] = [0, current_event, current_jet]
             reco_labels[j] = [(track_algo & 1 << 2)/4, (track_algo & 1 << 3)/8]
@@ -162,7 +161,7 @@ def main(argv):
             for k in range(j+1, ntracks):
                 
                 #set edge features
-                #delta_pt = abs(node_features[j][0] - node_features[k][0])
+                #delta_pt = abs(node_features_base[j][0] - node_features_base[k][0])
                 #edge_features[counter:counter+2] = [delta_pt]
 
                 #truth labels - vertices have to share the same HF ancestor
@@ -193,9 +192,13 @@ def main(argv):
         #create graph objects and append them to the list
         if ntracks > 1:
             g = dgl.graph((create_edge_list(ntracks)))
-            g.ndata['features'] = th.from_numpy(node_features)
-            g.ndata['info'] = th.from_numpy(node_info)
+            g.ndata['features_base'] = th.from_numpy(node_features_base)
+            if incl_errors: g.ndata['features_errors'] = th.from_numpy(node_features_errors)
+            if incl_hits: g.ndata['features_hits'] = th.from_numpy(node_features_hits)
+            if incl_corr: g.ndata['features_corr'] = th.from_numpy(node_features_corrs)
+            g.ndata['graph_info'] = th.from_numpy(node_info)
             g.ndata['reco_labels'] = th.from_numpy(reco_labels)
+            g.ndata['truth_info'] = th.from_numpy(truth_info)
             g.edata['bin_labels'] = th.from_numpy(bin_labels)
             g.edata['mult_labels'] = th.from_numpy(mult_labels)
             g_list.append(g)

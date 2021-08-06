@@ -27,10 +27,10 @@ remove_pv = True #toggle to remove all tracks that are already associated with p
 #input data parameters - PROCESSING, GNN
 incl_errors = True #include diagonal covariance matrix GNN features
 incl_corr = False #include off-diagonal covariance matrix GNN features
-incl_hits = False #include GNN features related to low-level hit information
+incl_hits = True #include GNN features related to low-level hit information
 
-#neural network options
-load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
+#neural network options - GNN
+load_checkpoint = True #toggle whether to load previous neural network checkpoint (continue training from previous point)
 valp = 0.2 #fraction of data reserved for validation
 testp = 0.1 #fraction of data reserved for testing
 
@@ -57,5 +57,9 @@ vertex_threshold = 0 #maximum distance for non HF tracks to be marked as part of
 incl_btoc = True #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's or separate them based on their direct HF ancestors
 
 #plotting options - PLOTTING
-jet_pt_bound = [25,200] #boundary jet pT for plots
-jet_eta_bound = [-2,2] #boundary jet eta for plots
+use_atlas_style = False
+track_pt_bound = [track_pt_cut/1000,50]
+track_d0_bound = [-25, 25]
+track_z0_bound = [-track_z0_cut, track_z0_cut]
+jet_pt_bound = [jet_pt_cut/1000,200] #boundary jet pT [GeV] for plots
+jet_eta_bound = [-2.5,2.5] #boundary jet eta for plots

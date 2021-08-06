@@ -33,9 +33,7 @@ def evaluate_confusion_mult(true, pred):
 
 
 #get list of events GNN performs poorly on
-def evaluate_jet(graph, hist_list, bad_events, multi_class, bin_threshold, mult_threshold):
-
-    node_info = graph.ndata['info'].cpu().detach().numpy().astype(int)
+def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
 
     #store recall for each class
     if not multi_class:
@@ -61,10 +59,9 @@ def evaluate_jet(graph, hist_list, bad_events, multi_class, bin_threshold, mult_
 
     for j in range(cm.shape[0]):
         if r_array[j] < r_threshold[j] and r_array[j] >= 0:
-            bad_events = np.append(bad_events, [[node_info[0,0], node_info[0,1], node_info[0,2]]], axis=0)
-            break
-
-    return bad_events
+            return True
+            
+    return False
 
 
 def find_vertices_bin(graph, mode, score_threshold):
@@ -210,45 +207,3 @@ def print_output(multi_class, cm):
         print(f'True 4 || {cm[4,0]:12d} | {cm[4,1]:12d} | {cm[4,2]:12d} | {cm[4,3]:12d} | {cm[4,4]:12d} || {cm[4,4]/(cm[4,0]+cm[4,1]+cm[4,2]+cm[4,3]+cm[4,4]):.4f}')
         print('----------------------------------------------------------------------------------------------')
         print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
-
-
-def plot_metric_hist(hist_list, outfile_name, ext):
-    canv1 = TCanvas("c1", "c1", 800, 600)
-    canv1.SetGrid()
-    colorlist = [1,4,8,2,6]
-    gStyle.SetOptStat(0)
-    legend = TLegend(0.78,0.95-0.1*max(len(hist_list),2),0.98,0.95)
-
-    for i in range(len(hist_list)):
-        legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(hist_list[i].GetName(), hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
-        hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
-        hist_list[i].SetLineWidth(3)
-        if hist_list[i].GetEntries(): hist_list[i].Scale(1./(hist_list[i].GetEntries()))
-        hist_list[i].SetMaximum(1.2)
-        if i == 0: hist_list[i].Draw()
-        else:hist_list[i].Draw("SAMES")
-    legend.SetTextSize(0.025)
-    legend.Draw("SAME")
-    canv1.SaveAs(outfile_name+ext)
-    canv1.Clear()
-
-
-def plot_profile(profile_list, outfile_name, labels, ylimit, ext):
-    canv1 = TCanvas("c1", "c1", 800, 600)
-    canv1.SetGrid()
-    colorlist = [1,4,8,2,6]
-    gStyle.SetOptStat(0)
-    legend = TLegend(0.78,0.95-0.1*max(len(profile_list),2),0.98,0.95)
-
-    for i in range(len(profile_list)):
-        legend.AddEntry(profile_list[i], "#splitline{%s}{#splitline{%d entries}{y-mean=%.2f}}"%(labels[i], profile_list[i].GetEntries(), profile_list[i].GetMean(2)), "l")
-        profile_list[i].SetLineColorAlpha(colorlist[i],0.65)
-        profile_list[i].SetLineWidth(3)
-        profile_list[i].SetMaximum(ylimit[1])
-        profile_list[i].SetMinimum(ylimit[0])
-        if i == 0: profile_list[i].Draw()
-        else:profile_list[i].Draw("SAMES")
-    legend.SetTextSize(0.025)
-    legend.Draw("SAME")
-    canv1.SaveAs(outfile_name+ext)
-    canv1.Clear()

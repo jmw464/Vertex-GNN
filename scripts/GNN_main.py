@@ -4,6 +4,7 @@
 
 from GNN_model import *
 from GNN_eval import *
+from plot_functions import *
 import options
 
 import matplotlib as mpl
@@ -49,7 +50,6 @@ def main(argv):
     learning_rate = options.learning_rate
     batch_size = options.batch_size
     attention_heads = options.attention_heads
-    in_features = options.nnfeatures_base + int(options.incl_errors)*options.nnfeatures_errors + int(options.incl_corr)*options.nnfeatures_corrs + int(options.incl_hits)*options.nnfeatures_hits
     nodemlp_sizes = options.nodemlp_sizes
     gat_sizes = options.gat_sizes
     edgemlp_sizes = options.edgemlp_sizes
@@ -77,7 +77,23 @@ def main(argv):
     registerfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_register"
     checkpointfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_model.pt"
 
-    nnfeatures = (dgl.load_graphs(train_infile_name, [0]))[0][0].ndata['features'].size()[1]
+    sample_graph = dgl.load_graphs(train_infile_name, [0])[0][0]
+    #calculate number of features in graphs
+    incl_errors = incl_corr = incl_hits = False
+    nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
+    in_features = nnfeatures_base
+    if 'features_errors' in sample_graph.ndata.keys():
+        nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
+        incl_errors = True
+        in_features += nnfeatures_errors
+    if 'features_hits' in sample_graph.ndata.keys():
+        nnfeatures_hits = sample_graph.ndata['features_hits'].size()[1]
+        incl_hits = True
+        in_features += nnfeatures_hits
+    if 'features_corr' in sample_graph.ndata.keys():
+        nnfeatures_corr = sample_graph.ndata['features_corr'].size()[1]
+        incl_corr = True
+        in_features += nnfeatures_corr
     
     #read in values from parameter file
     truth_frac = 0
@@ -171,9 +187,16 @@ def main(argv):
                 iend = (ibatch+1)*batch_size
             batch = dgl.batch(dgl.load_graphs(train_infile_name, list(range(istart, iend)))[0])
 
+            #construct feature matrix
+            features = batch.ndata['features_base']
+            if incl_errors: features = th.cat((features, batch.ndata['features_errors']),dim=1)
+            if incl_hits: features = th.cat((features, batch.ndata['features_hits']),dim=1)
+            if incl_corr: features = th.cat((features, batch.ndata['features_corr']),dim=1)
+
             #process batch
             batch = batch.to(device) #transfer batch to relevant device
-            pred = model(batch, batch.ndata['features'])
+            features = features.to(device)
+            pred = model(batch, features)
             target = batch.edata[labeltype]
             if multi_class: target = target[:,0].long()
             pred_lt = loss(pred, target)
@@ -209,9 +232,16 @@ def main(argv):
                 iend = (ibatch+1)*batch_size
             val_batch = dgl.batch(dgl.load_graphs(val_infile_name, list(range(istart, iend)))[0])
 
+            #construct feature matrix
+            val_features = val_batch.ndata['features_base']
+            if incl_errors: val_features = th.cat((val_features, val_batch.ndata['features_errors']),dim=1)
+            if incl_hits: val_features = th.cat((val_features, val_batch.ndata['features_hits']),dim=1)
+            if incl_corr: val_features = th.cat((val_features, val_batch.ndata['features_corr']),dim=1)
+
             #process batch
             val_batch = val_batch.to(device)
-            pred = model(val_batch, val_batch.ndata['features'])
+            val_features = val_features.to(device)
+            pred = model(val_batch, val_features)
             target = val_batch.edata[labeltype]
             if multi_class: target = target[:,0].long()
             pred_lv = loss(pred, target)
@@ -277,13 +307,19 @@ def main(argv):
             iend = (ibatch+1)*batch_size
         test_batch = dgl.batch(dgl.load_graphs(test_infile_name, list(range(istart, iend)))[0])
 
+        #construct feature matrix
+        test_features = test_batch.ndata['features_base']
+        if incl_errors: test_features = th.cat((test_features, test_batch.ndata['features_errors']),dim=1)
+        if incl_hits: test_features = th.cat((test_features, test_batch.ndata['features_hits']),dim=1)
+        if incl_corr: test_features = th.cat((test_features, test_batch.ndata['features_corr']),dim=1)
+
         #process batch
         test_batch = test_batch.to(device)
-        node_info = test_batch.ndata['info'].cpu().numpy()
+        test_features = test_features.to(device)
         edge_labels = test_batch.edata[labeltype]
         
         #evaluate results
-        pred = activation(model(test_batch, test_batch.ndata['features']).float()).cpu().detach().numpy()
+        pred = activation(model(test_batch, test_features).float()).cpu().detach().numpy()
         true = test_batch.edata[labeltype].cpu().numpy().astype(int)
 
         #fill edge score histograms
@@ -303,13 +339,18 @@ def main(argv):
         test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
         g_test_list = dgl.unbatch(test_batch)
-        overall_g_list.extend(g_test_list)
 
         #evaluate bad events and find secondary vertices
+        total_bad = 0
         for g in g_test_list:
-            bad_events = evaluate_jet(g, hist_r_list, bad_events, multi_class, bin_threshold, mult_threshold)
-            
+            if is_bad_jet(g, hist_r_list, multi_class, bin_threshold, mult_threshold):
+                total_bad += 1
+                g.ndata['bad'] = th.from_numpy(np.ones((g.number_of_nodes(),1)))
+            else:
+                g.ndata['bad'] = th.from_numpy(np.zeros((g.number_of_nodes(),1))) 
+
         total_jets += len(g_test_list)
+        overall_g_list.extend(g_test_list)
 
         if not multi_class:
             cm += evaluate_confusion_bin(true, pred)
@@ -318,16 +359,6 @@ def main(argv):
 
     #print test results
     print_output(multi_class, cm)
-
-    #sort array with bad events by file, event and jet
-    indices = np.lexsort((bad_events[:,2], bad_events[:,1], bad_events[:,0]))
-    total_bad = np.shape(bad_events)[0]
-    bad_events = bad_events[indices]
-    
-    #output bad events to file
-    for i in range(total_bad):
-        registerfile.write(str(bad_events[i,0])+' '+str(bad_events[i,1])+' '+str(bad_events[i,2])+'\n')
-    print("Marked {}% of {} jets as bad\n".format(100*total_bad/total_jets, total_jets))
 
     #save results to file
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
@@ -344,7 +375,7 @@ def main(argv):
     ext = ["_recall.png", "_score.png"]
     hist_list_list = [hist_r_list, hist_s_list]
     for i in range(len(hist_list_list)):
-        plot_metric_hist(hist_list_list[i], outfile_name, ext[i])
+        plot_metric_hist(hist_list_list[i], [0.0,1.2], outfile_name+ext[i])
 
 
 if __name__ == '__main__':

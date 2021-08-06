@@ -51,13 +51,19 @@ def main(argv):
             total_edges += list(graph.edata['bin_labels'][:,0].size())[0]
         
             for i in range(ntracks):
-                graph.ndata['info'][i,0] = ifile
+                graph.ndata['graph_info'][i,0] = ifile
 
             g_list.append(graph)
 
         ifile += 1        
     
     random.shuffle(g_list)
+
+    #calculate number of features in graphs
+    nnfeatures = g_list[0].ndata['features_base'].size()[1]
+    if 'features_errors' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_errors'].size()[1]
+    if 'features_hits' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_hits'].size()[1]
+    if 'features_corr' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_corr'].size()[1]
 
     #calculate size of testing, training and validation set
     test_len = int(round(testp*ngraphs))
