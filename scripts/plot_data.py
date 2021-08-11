@@ -92,6 +92,11 @@ def main(argv):
     hist_jet_phi_val = TH1D("jet_phi_val", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     hist_jet_phi_test = TH1D("jet_phi_test", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     
+    bin_edges = np.linspace(-0.5,10.5,12)
+    hist_no_trk_train = TH1D("no_trk_train", "Number of tracks per jet in dataset;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_val = TH1D("no_trk_val", "Number of tracks per jet in dataset;Number of tracks;Normalized entries", 11, bin_edges)
+    hist_no_trk_test = TH1D("no_trk_test", "Number of tracks per jet in dataset;Number of tracks;Normalized entries", 11, bin_edges)
+     
     if incl_errors:
         hist_trk_p_err_train = TH1D("trk_p_err_train", "Track 1/p error in dataset;1/p error [1/MeV];Normalized entries", 20, -0.0001, 0.0001)
         hist_trk_p_err_val = TH1D("trk_p_err_val", "Track 1/p error in dataset;1/p error [1/MeV];Normalized entries", 20, -0.0001, 0.0001)
@@ -136,9 +141,10 @@ def main(argv):
             hist_trk_phi_train.Fill(features_base[i,2])
             hist_trk_d0_train.Fill(features_base[i,3])
             hist_trk_z0_train.Fill(features_base[i,4])
-            hist_jet_pt_train.Fill(features_base[i,5])
-            hist_jet_eta_train.Fill(features_base[i,6])
-            hist_jet_phi_train.Fill(features_base[i,7])
+        hist_jet_pt_train.Fill(features_base[0,5])
+        hist_jet_eta_train.Fill(features_base[0,6])
+        hist_jet_phi_train.Fill(features_base[0,7])
+        hist_no_trk_train.Fill(graph.num_nodes())
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             for i in range(len(features_errors[:,0])):
@@ -157,9 +163,10 @@ def main(argv):
             hist_trk_phi_val.Fill(features_base[i,2])
             hist_trk_d0_val.Fill(features_base[i,3])
             hist_trk_z0_val.Fill(features_base[i,4])
-            hist_jet_pt_val.Fill(features_base[i,5])
-            hist_jet_eta_val.Fill(features_base[i,6])
-            hist_jet_phi_val.Fill(features_base[i,7])
+        hist_jet_pt_val.Fill(features_base[0,5])
+        hist_jet_eta_val.Fill(features_base[0,6])
+        hist_jet_phi_val.Fill(features_base[0,7])
+        hist_no_trk_val.Fill(graph.num_nodes())
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             for i in range(len(features_errors[:,0])):
@@ -178,9 +185,10 @@ def main(argv):
             hist_trk_phi_test.Fill(features_base[i,2])
             hist_trk_d0_test.Fill(features_base[i,3])
             hist_trk_z0_test.Fill(features_base[i,4])
-            hist_jet_pt_test.Fill(features_base[i,5])
-            hist_jet_eta_test.Fill(features_base[i,6])
-            hist_jet_phi_test.Fill(features_base[i,7])
+        hist_jet_pt_test.Fill(features_base[0,5])
+        hist_jet_eta_test.Fill(features_base[0,6])
+        hist_jet_phi_test.Fill(features_base[0,7])
+        hist_no_trk_test.Fill(graph.num_nodes())
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             for i in range(len(features_errors[:,0])):
@@ -198,6 +206,7 @@ def main(argv):
     plot_hist([hist_jet_pt_test, hist_jet_pt_val, hist_jet_pt_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_jet_pt.png", "HIST", scaling=[mean_features[5],std_features[5]])
     plot_hist([hist_jet_eta_test, hist_jet_eta_val, hist_jet_eta_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_jet_eta.png", "HIST", scaling=[mean_features[6],std_features[6]])
     plot_hist([hist_jet_phi_test, hist_jet_phi_val, hist_jet_phi_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_jet_phi.png", "HIST", scaling=[mean_features[7],std_features[7]])
+    plot_hist([hist_no_trk_test, hist_no_trk_val, hist_no_trk_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_no_trk.png", "HIST")
     if incl_errors:
         plot_hist([hist_trk_p_err_test, hist_trk_p_err_val, hist_trk_p_err_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_trk_p_err.png", "HIST", scaling=[mean_features[8],std_features[8]])
         plot_hist([hist_trk_theta_err_test, hist_trk_theta_err_val, hist_trk_theta_err_train], ["testing", "validation", "training"], True, False, True, data_path+data_name+"_trk_theta_err.png", "HIST", scaling=[mean_features[9],std_features[9]])

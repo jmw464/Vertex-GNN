@@ -9,7 +9,7 @@ import torch.nn as nn
 import os,sys,math,glob,time
 import numpy as np
 import ROOT
-from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile, gPad
+from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile, gPad, TGraph, TMultiGraph
 
 from GNN_eval import *
 from plot_functions import *
@@ -39,6 +39,7 @@ def main(argv):
     score_threshold = options.score_threshold
     jet_pt_bound = options.jet_pt_bound
     jet_eta_bound = options.jet_eta_bound
+    plot_roc = options.plot_roc
 
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
@@ -134,7 +135,9 @@ def main(argv):
     #initialize matrices for overall SV predictions and plots
     gnn_cm = np.zeros((3,3), dtype=int)
     sv1_cm = np.zeros((3,3), dtype=int)
+    b_tot = b_found_gnn = b_found_sv1 = c_tot = c_found_gnn = c_found_sv1 = no_sv_tot = fake_found_gnn = fake_found_sv1 = tot_pred_gnn = tot_pred_sv1 = 0
 
+    #evaluate run statistics
     for ibatch in range(batches):
         
         #calculate batch indices
@@ -212,23 +215,38 @@ def main(argv):
 
             #fill histograms for b SVs
             if no_b > 0 or no_btoc > 0:
-               sv1_pt_profile_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-               gnn_pt_profile_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-               sv1_eta_profile_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-               gnn_eta_profile_eff_b .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                b_tot += 1
+                b_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
+                b_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+                sv1_pt_profile_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_pt_profile_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                sv1_eta_profile_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_eta_profile_eff_b .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
 
             #fill histograms for c SVs
             if no_c > 0 and no_b == 0 and no_btoc == 0:
-               sv1_pt_profile_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-               gnn_pt_profile_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-               sv1_eta_profile_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-               gnn_eta_profile_eff_c .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                c_tot += 1
+                c_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
+                c_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+                sv1_pt_profile_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_pt_profile_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                sv1_eta_profile_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_eta_profile_eff_c .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
 
             if no_c == 0 and no_b == 0 and no_btoc == 0:
-               sv1_pt_profile_fr.Fill(jet_pt, float(1-jet_sv1_cm[0,0]))
-               gnn_pt_profile_fr.Fill(jet_pt, float(1-jet_gnn_cm[0,0]))
-               sv1_eta_profile_fr.Fill(jet_eta, float(1-jet_sv1_cm[0,0]))
-               gnn_eta_profile_fr .Fill(jet_eta, float(1-jet_gnn_cm[0,0])) 
+                no_sv_tot += 1
+                fake_found_sv1 += (1-jet_sv1_cm[0,0])
+                fake_found_gnn += (1-jet_gnn_cm[0,0])
+
+            if np.sum(jet_sv1_cm[:,1]+jet_sv1_cm[:,2]) > 0:
+                tot_pred_sv1 += 1
+                sv1_pt_profile_fr.Fill(jet_pt, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
+                sv1_eta_profile_fr.Fill(jet_eta, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
+
+            if np.sum(jet_gnn_cm[:,1]+jet_gnn_cm[:,2]) > 0:
+                tot_pred_gnn += 1
+                gnn_pt_profile_fr.Fill(jet_pt, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2]))
+                gnn_eta_profile_fr .Fill(jet_eta, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])) 
 
             for vertex_metric in gnn_vertex_metrics:
                 hist_pc_list[0].Fill(vertex_metric[0])
@@ -245,24 +263,10 @@ def main(argv):
     print(f'Actual 1 SV  || {gnn_cm[1,0]:5} /{sv1_cm[1,0]:6} | {gnn_cm[1,1]:5} /{sv1_cm[1,1]:6} | {gnn_cm[1,2]:5} /{sv1_cm[1,2]:6} |')
     print(f'Actual >1 SV || {gnn_cm[2,0]:5} /{sv1_cm[2,0]:6} | {gnn_cm[2,1]:5} /{sv1_cm[2,1]:6} | {gnn_cm[2,2]:5} /{sv1_cm[2,2]:6} |')
     print('---------------------------------------------------------------')
-
-    canv1 = TCanvas("c1", "c1", 800, 600)
-    gStyle.SetOptStat(0)
-    gPad.SetLogy()
-    hist_list = [no_true_sv_hist_tot, no_true_sv_hist_b, no_true_sv_hist_c, no_true_sv_hist_btoc]
-    colorlist = [1,4,2,8]
-    labellist = ['total', 'bH', 'prompt cH', 'bH->cH']
-    legend = TLegend(0.78,0.55,0.98,0.95)
-    for i in range(len(hist_list)):
-        hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
-        legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(labellist[i], hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
-        if i == 0: hist_list[i].Draw()
-        else: hist_list[i].Draw("SAMES E1")
-    legend.SetTextSize(0.025)
-    legend.Draw("SAME")
-    canv1.SaveAs(outfile_name+"_no_sv.png")
-    canv1.Clear()
-    del canv1
+    print(f'Edge score threshold: {score_threshold}')
+    print(f'Global b-jet vertex efficiency: {b_found_gnn/b_tot:4} (GNN), {b_found_sv1/b_tot:4} (SV1)')
+    print(f'Global c-jet vertex efficiency: {c_found_gnn/c_tot:4} (GNN), {c_found_sv1/c_tot:4} (SV1)')
+    print(f'Global vertex fake rate: {fake_found_gnn/tot_pred_gnn:4} (GNN), {fake_found_sv1/tot_pred_sv1:4} (SV1)')
 
     plot_profile([sv1_pt_profile_eff_c, gnn_pt_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_c.png")
     plot_profile([sv1_pt_profile_eff_b, gnn_pt_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_b.png")
@@ -283,6 +287,125 @@ def main(argv):
     hist_list_list = [hist_pc_list, hist_pf_list]
     for i in range(len(hist_list_list)):
         plot_metric_hist(hist_list_list[i], [0.0,1.4], outfile_name+ext[i])
+
+    canv1 = TCanvas("c1", "c1", 800, 600)
+
+    #evaluate roc data
+    if plot_roc:
+        score_threshold_array = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        c_efficiency = np.zeros(len(score_threshold_array))
+        b_efficiency = np.zeros(len(score_threshold_array))
+        fake_rate_num = np.zeros(len(score_threshold_array))
+        fake_rate_denom = np.zeros(len(score_threshold_array))
+
+        for ibatch in range(batches):
+            #calculate batch indices
+            istart = ibatch*batch_size
+            if ibatch == (batches-1) and test_len%batch_size != 0:
+                iend = istart + (test_len%batch_size)
+            else:
+                iend = (ibatch+1)*batch_size
+
+            #load batch from file
+            batch = dgl.batch(dgl.load_graphs(graphfile_name, list(range(istart, iend)))[0])
+            g_list = dgl.unbatch(batch)
+
+            for ist in range(len(score_threshold_array)):
+                score_threshold = score_threshold_array[ist]
+
+                for g in g_list:
+                    gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
+                    true_vertices = find_vertices_bin(g, 'truth', score_threshold)
+                    jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
+
+                    no_b = no_c = no_btoc = 0
+                    for i in range(len(true_vertices)):
+                        true_vertex = true_vertices[i]
+                        edge_id = g.edge_id(true_vertex[0],true_vertex[1])
+                        vertex_flavor = g.edata['mult_labels'][edge_id]
+                        if vertex_flavor == 1:
+                            no_b += 1
+                        elif vertex_flavor == 2:
+                            no_c += 1
+                        elif vertex_flavor == 3:
+                            no_btoc += 1
+
+                    #fill histograms for b SVs
+                    if no_b > 0 or no_btoc > 0:
+                        b_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+
+                    #fill histograms for c SVs
+                    if no_c > 0 and no_b == 0 and no_btoc == 0:
+                        c_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+
+                    if no_c == 0 and no_b == 0 and no_btoc == 0:
+                        fake_rate_num[ist] += (1-jet_gnn_cm[0,0])
+
+                    fake_rate_denom[ist] += (1-np.sum(jet_gnn_cm[:,0]))
+
+        b_efficiency = b_efficiency/b_tot
+        c_efficiency = c_efficiency/c_tot
+        fake_rate = np.divide(fake_rate_num,fake_rate_denom)
+        sv1_b_efficiency = np.array([b_found_sv1/b_tot])
+        sv1_c_efficiency = np.array([c_found_sv1/c_tot])
+        sv1_fake_rate = np.array([fake_found_sv1/tot_pred_sv1])
+
+        mg = TMultiGraph()
+        roc_curve_b = TGraph(len(score_threshold_array), b_efficiency, fake_rate)
+        roc_curve_c = TGraph(len(score_threshold_array), c_efficiency, fake_rate)
+        sv1_eff_b = TGraph(1, sv1_b_efficiency, sv1_fake_rate)
+        sv1_eff_c = TGraph(1, sv1_c_efficiency, sv1_fake_rate)
+        roc_curve_b.SetLineColor(1)
+        roc_curve_c.SetLineColor(4)
+        sv1_eff_b.SetLineColor(1)
+        sv1_eff_c.SetLineColor(4)
+        roc_curve_b.SetMarkerColor(1)
+        roc_curve_c.SetMarkerColor(4)
+        sv1_eff_b.SetMarkerColor(1)
+        sv1_eff_c.SetMarkerColor(4)
+        roc_curve_b.SetMarkerStyle(20)
+        roc_curve_c.SetMarkerStyle(20)
+        sv1_eff_b.SetMarkerStyle(22)
+        sv1_eff_c.SetMarkerStyle(22)
+        mg.Add(roc_curve_b)
+        mg.Add(roc_curve_c)
+        mg.Add(sv1_eff_b)
+        mg.Add(sv1_eff_c)
+        mg.SetTitle("; Efficiency; Fake rate")
+        mg.Draw("ALP")
+        mg.GetXaxis().SetLimits(0.7,1.)
+        mg.SetMinimum(0.)
+        mg.SetMaximum(0.3)
+        legend = TLegend(0.15,0.88-0.08*4,0.3,0.88,'','NDC')
+        legend.AddEntry(roc_curve_b, "b-jets (GNN)","lp")
+        legend.AddEntry(roc_curve_c, "c-jets (GNN)","lp")
+        legend.AddEntry(sv1_eff_b, "b-jets (SV1)","p")
+        legend.AddEntry(sv1_eff_c, "c-jets (SV1)","p")
+        legend.SetTextSize(0.025)
+        legend.SetFillStyle(0)
+        legend.SetBorderSize(0)
+        legend.Draw("SAME")
+        canv1.SaveAs(outfile_name+"_roc.png")
+        canv1.Clear()
+
+    gStyle.SetOptStat(0)
+    gPad.SetLogy()
+    hist_list = [no_true_sv_hist_tot, no_true_sv_hist_b, no_true_sv_hist_c, no_true_sv_hist_btoc]
+    colorlist = [1,4,2,8]
+    labellist = ['total', 'bH', 'prompt cH', 'bH->cH']
+    legend = TLegend(0.76,0.88-0.08*len(hist_list),0.91,0.88,'','NDC')
+    for i in range(len(hist_list)):
+        hist_list[i].SetLineColorAlpha(colorlist[i],0.65)
+        legend.AddEntry(hist_list[i], "#splitline{%s}{#splitline{%d entries}{mean=%.2f}}"%(labellist[i], hist_list[i].GetEntries(), hist_list[i].GetMean()), "l")
+        if i == 0: hist_list[i].Draw()
+        else: hist_list[i].Draw("SAMES E1")
+    legend.SetTextSize(0.02)
+    legend.SetFillStyle(0)
+    legend.SetBorderSize(0)
+    legend.Draw("SAME")
+    canv1.SaveAs(outfile_name+"_no_sv.png")
+    canv1.Clear()
+    del canv1
 
 
 if __name__ == '__main__':

@@ -58,6 +58,7 @@ incl_btoc = True #toggle whether to combine tracks from b hadrons and all c hadr
 
 #plotting options - PLOTTING
 use_atlas_style = False
+plot_roc = True #plotting ROC curve significantly increases computation time for compare_performance.py
 track_pt_bound = [track_pt_cut/1000,50]
 track_d0_bound = [-25, 25]
 track_z0_bound = [-track_z0_cut, track_z0_cut]

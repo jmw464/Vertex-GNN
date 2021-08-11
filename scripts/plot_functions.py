@@ -33,8 +33,6 @@ def plot_hist(histlist, labellist, norm, log, overflow, filename, options, scali
 
         if histlist[i].GetMaximum() > maximum: maximum = histlist[i].GetMaximum()
         histstack.Add(histlist[i])
-        #if i == 0: histlist[i].Draw(options)
-        #else: histlist[i].Draw(same+options)
 
     histstack.SetMaximum(maximum*1.4)
     histstack.Draw(options)
@@ -54,6 +52,7 @@ def plot_hist(histlist, labellist, norm, log, overflow, filename, options, scali
     canv.SaveAs(filename)
     if log: gPad.Clear()
     canv.Clear()
+    del canv
 
 
 #plot difference between two lists of normalized histograms
@@ -104,6 +103,7 @@ def plot_hist_diff(histlist1, histlist2, labellist, log, overflow, filename, opt
     canv.SaveAs(filename)
     if log: gPad.Clear()
     canv.Clear()
+    del canv
 
 
 def plot_metric_hist(hist_list, ylimit, filename):
@@ -131,6 +131,7 @@ def plot_metric_hist(hist_list, ylimit, filename):
     legend.Draw("SAME")
     canv.SaveAs(filename)
     canv.Clear()
+    del canv
 
 
 def plot_profile(profile_list, labels, ylimit, overflow, filename):
@@ -161,3 +162,4 @@ def plot_profile(profile_list, labels, ylimit, overflow, filename):
     legend.Draw("same")
     canv.SaveAs(filename)
     canv.Clear()
+    del canv
