@@ -161,7 +161,7 @@ def main(argv):
         for g in g_list:
             features = g.ndata['features_base'].numpy()
             bad_jet = g.ndata['bad'].numpy()[0,0]
-            categories = g.ndata['truth_info'].numpy()
+            categories = g.ndata['node_info'].numpy()
 
             ntrk = len(features[:,0])
             b_trk = c_trk = btoc_trk = nm_trk = o_trk = 0

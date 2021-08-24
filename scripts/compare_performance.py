@@ -106,6 +106,16 @@ def main(argv):
     sv1_eta_profile_eff_b = TProfile("sv1_eta_eff_b", "SV reconstruction efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_eff_b = TProfile("gnn_eta_eff_b", "SV reconstruction efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
 
+    sv1_lxy_profile_eff_c = TProfile("sv1_lxy_eff_c", "SV reconstruction efficiency for c jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
+    gnn_lxy_profile_eff_c = TProfile("gnn_lxy_eff_c", "SV reconstruction efficiency for c jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
+    sv1_lxy_profile_eff_b = TProfile("sv1_lxy_eff_b", "SV reconstruction efficiency for b jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
+    gnn_lxy_profile_eff_b = TProfile("gnn_lxy_eff_b", "SV reconstruction efficiency for b jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
+
+    sv1_ntrk_profile_eff_c = TProfile("sv1_ntrk_eff_c", "SV reconstruction efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_eff_c = TProfile("gnn_ntrk_eff_c", "SV reconstruction efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_ntrk_profile_eff_b = TProfile("sv1_ntrk_eff_b", "SV reconstruction efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_eff_b = TProfile("gnn_ntrk_eff_b", "SV reconstruction efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+
     sv1_pt_profile_fr = TProfile("sv1_pt_fr", "SV reconstruction fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
     gnn_pt_profile_fr = TProfile("gnn_pt_fr", "SV reconstruction fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_fr = TProfile("sv1_eta_fr", "SV reconstruction fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
@@ -152,7 +162,6 @@ def main(argv):
         g_list = dgl.unbatch(batch)
 
         for g in g_list:
-
             gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
             true_vertices = find_vertices_bin(g, 'truth', score_threshold)
             sv1_vertex = np.argwhere(g.ndata['reco_labels'].cpu().numpy().astype(int)[:,1]).flatten()
@@ -163,6 +172,7 @@ def main(argv):
             gnn_cm += jet_gnn_cm
             sv1_cm += jet_sv1_cm
 
+            pv = np.array([g.ndata['graph_info'][0,1], g.ndata['graph_info'][0,2], g.ndata['graph_info'][0,3]])
             jet_pt = g.ndata['features_base'][0,5]
             jet_eta = g.ndata['features_base'][0,6]
             if norm:
@@ -171,30 +181,39 @@ def main(argv):
 
             no_true_sv_hist_tot.Fill(len(true_vertices))
 
-            no_b = no_c = no_btoc = 0
+            no_b = no_c = 0
             for i in range(len(true_vertices)):
                 true_vertex = true_vertices[i]
                 edge_id = g.edge_id(true_vertex[0],true_vertex[1])
+
+                sv = np.array([g.ndata['node_info'][true_vertex[0],3], g.ndata['node_info'][true_vertex[0],4], g.ndata['node_info'][true_vertex[0],5]])
+                Lxy = np.linalg.norm(pv-sv)
                 vertex_flavor = g.edata['mult_labels'][edge_id]
+                ntrk = g.num_nodes()
                 if vertex_flavor == 1:
                     no_b += 1
                 elif vertex_flavor == 2:
                     no_c += 1
-                elif vertex_flavor == 3:
-                    no_btoc += 1
 
+                if vertex_flavor == 2:
+                    gnn_lxy_profile_eff_c.Fill(Lxy,int(gnn_vertex_assoc[i]>=0))
+                    sv1_lxy_profile_eff_c.Fill(Lxy,int(sv1_vertex_assoc[i]>=0))
+                elif vertex_flavor == 1:
+                    gnn_lxy_profile_eff_b.Fill(Lxy,int(gnn_vertex_assoc[i]>=0))
+                    sv1_lxy_profile_eff_b.Fill(Lxy,int(sv1_vertex_assoc[i]>=0))
+                
                 if gnn_vertex_assoc[i] >= 0:
                     index = gnn_vertex_assoc[i]
                     if vertex_flavor == 2:
                         gnn_pt_profile_corrp_c.Fill(jet_pt, gnn_vertex_metrics[index][0])
                         gnn_pt_profile_fakep_c.Fill(jet_pt, gnn_vertex_metrics[index][1])
                         gnn_eta_profile_corrp_c.Fill(jet_eta, gnn_vertex_metrics[index][0])
-                        gnn_eta_profile_fakep_c.Fill(jet_eta, gnn_vertex_metrics[index][1]) 
-                    elif vertex_flavor == 1 or vertex_flavor == 3:
+                        gnn_eta_profile_fakep_c.Fill(jet_eta, gnn_vertex_metrics[index][1])
+                    elif vertex_flavor == 1:
                         gnn_pt_profile_corrp_b.Fill(jet_pt, gnn_vertex_metrics[index][0])
                         gnn_pt_profile_fakep_b.Fill(jet_pt, gnn_vertex_metrics[index][1])
                         gnn_eta_profile_corrp_b.Fill(jet_eta, gnn_vertex_metrics[index][0])
-                        gnn_eta_profile_fakep_b.Fill(jet_eta, gnn_vertex_metrics[index][1]) 
+                        gnn_eta_profile_fakep_b.Fill(jet_eta, gnn_vertex_metrics[index][1])
 
                 if sv1_vertex_assoc[i] >= 0:
                     index = sv1_vertex_assoc[i]
@@ -203,7 +222,7 @@ def main(argv):
                         sv1_pt_profile_fakep_c.Fill(jet_pt, sv1_vertex_metrics[index][1])
                         sv1_eta_profile_corrp_c.Fill(jet_eta, sv1_vertex_metrics[index][0])
                         sv1_eta_profile_fakep_c.Fill(jet_eta, sv1_vertex_metrics[index][1]) 
-                    elif vertex_flavor == 1 or vertex_flavor == 3:
+                    elif vertex_flavor == 1:
                         sv1_pt_profile_corrp_b.Fill(jet_pt, sv1_vertex_metrics[index][0])
                         sv1_pt_profile_fakep_b.Fill(jet_pt, sv1_vertex_metrics[index][1])
                         sv1_eta_profile_corrp_b.Fill(jet_eta, sv1_vertex_metrics[index][0])
@@ -211,10 +230,9 @@ def main(argv):
 
             if no_b > 0: no_true_sv_hist_b.Fill(no_b)
             if no_c > 0: no_true_sv_hist_c.Fill(no_c)
-            if no_btoc > 0: no_true_sv_hist_btoc.Fill(no_btoc)
 
             #fill histograms for b SVs
-            if no_b > 0 or no_btoc > 0:
+            if no_b > 0:
                 b_tot += 1
                 b_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
                 b_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
@@ -222,9 +240,11 @@ def main(argv):
                 gnn_pt_profile_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
                 sv1_eta_profile_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
                 gnn_eta_profile_eff_b .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                sv1_ntrk_profile_eff_b.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_ntrk_profile_eff_b.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2])) 
 
             #fill histograms for c SVs
-            if no_c > 0 and no_b == 0 and no_btoc == 0:
+            if no_c > 0 and no_b == 0:
                 c_tot += 1
                 c_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
                 c_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
@@ -232,8 +252,10 @@ def main(argv):
                 gnn_pt_profile_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
                 sv1_eta_profile_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
                 gnn_eta_profile_eff_c .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+                sv1_ntrk_profile_eff_c.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
+                gnn_ntrk_profile_eff_c.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
 
-            if no_c == 0 and no_b == 0 and no_btoc == 0:
+            if no_c == 0 and no_b == 0:
                 no_sv_tot += 1
                 fake_found_sv1 += (1-jet_sv1_cm[0,0])
                 fake_found_gnn += (1-jet_gnn_cm[0,0])
@@ -249,12 +271,12 @@ def main(argv):
                 gnn_eta_profile_fr .Fill(jet_eta, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])) 
 
             for vertex_metric in gnn_vertex_metrics:
-                hist_pc_list[0].Fill(vertex_metric[0])
-                hist_pf_list[0].Fill(vertex_metric[1])
-
-            for vertex_metric in sv1_vertex_metrics:
                 hist_pc_list[1].Fill(vertex_metric[0])
                 hist_pf_list[1].Fill(vertex_metric[1])
+
+            for vertex_metric in sv1_vertex_metrics:
+                hist_pc_list[0].Fill(vertex_metric[0])
+                hist_pf_list[0].Fill(vertex_metric[1])
 
     print('Secondary Vertex prediction results per jet (GNN/SV1):')
     print('             ||  Pred no SV   |   Pred 1 SV   |   Pred >1 SV  |')
@@ -282,6 +304,10 @@ def main(argv):
     plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_b.png")
     plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_c.png")
     plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_b.png")
+    plot_profile([sv1_lxy_profile_eff_b, gnn_lxy_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_lxy_b.png")
+    plot_profile([sv1_lxy_profile_eff_c, gnn_lxy_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_lxy_c.png")
+    plot_profile([sv1_ntrk_profile_eff_b, gnn_ntrk_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_ntrk_b.png")
+    plot_profile([sv1_ntrk_profile_eff_c, gnn_ntrk_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_ntrk_c.png")
 
     ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]
@@ -318,7 +344,7 @@ def main(argv):
                     true_vertices = find_vertices_bin(g, 'truth', score_threshold)
                     jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
 
-                    no_b = no_c = no_btoc = 0
+                    no_b = no_c = 0
                     for i in range(len(true_vertices)):
                         true_vertex = true_vertices[i]
                         edge_id = g.edge_id(true_vertex[0],true_vertex[1])
@@ -327,18 +353,16 @@ def main(argv):
                             no_b += 1
                         elif vertex_flavor == 2:
                             no_c += 1
-                        elif vertex_flavor == 3:
-                            no_btoc += 1
 
                     #fill histograms for b SVs
-                    if no_b > 0 or no_btoc > 0:
+                    if no_b > 0:
                         b_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
 
                     #fill histograms for c SVs
-                    if no_c > 0 and no_b == 0 and no_btoc == 0:
+                    if no_c > 0 and no_b == 0:
                         c_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
 
-                    if no_c == 0 and no_b == 0 and no_btoc == 0:
+                    if no_c == 0 and no_b == 0:
                         fake_rate_num[ist] += (1-jet_gnn_cm[0,0])
 
                     fake_rate_denom[ist] += (1-np.sum(jet_gnn_cm[:,0]))
@@ -375,7 +399,7 @@ def main(argv):
         mg.Draw("ALP")
         mg.GetXaxis().SetLimits(0.7,1.)
         mg.SetMinimum(0.)
-        mg.SetMaximum(0.3)
+        mg.SetMaximum(0.5)
         legend = TLegend(0.15,0.88-0.08*4,0.3,0.88,'','NDC')
         legend.AddEntry(roc_curve_b, "b-jets (GNN)","lp")
         legend.AddEntry(roc_curve_c, "c-jets (GNN)","lp")
@@ -390,9 +414,9 @@ def main(argv):
 
     gStyle.SetOptStat(0)
     gPad.SetLogy()
-    hist_list = [no_true_sv_hist_tot, no_true_sv_hist_b, no_true_sv_hist_c, no_true_sv_hist_btoc]
+    hist_list = [no_true_sv_hist_tot, no_true_sv_hist_b, no_true_sv_hist_c]
     colorlist = [1,4,2,8]
-    labellist = ['total', 'bH', 'prompt cH', 'bH->cH']
+    labellist = ['total', 'bH', 'prompt cH']
     legend = TLegend(0.76,0.88-0.08*len(hist_list),0.91,0.88,'','NDC')
     for i in range(len(hist_list)):
         hist_list[i].SetLineColorAlpha(colorlist[i],0.65)

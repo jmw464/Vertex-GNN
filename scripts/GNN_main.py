@@ -105,8 +105,6 @@ def main(argv):
         truth_frac = float(paramfile.readline())
         b_frac = float(paramfile.readline())
         c_frac = float(paramfile.readline())
-        btoc_frac = float(paramfile.readline())
-        o_frac = float(paramfile.readline())
     else:
         print("ERROR: Specified parameter file not found")
         return 1
@@ -117,11 +115,11 @@ def main(argv):
     #reweight positive labels automatically if desired
     if reweight and truth_frac:
         pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
-        mult_weights = th.tensor([1./(1-b_frac-c_frac-btoc_frac-o_frac), 1./b_frac, 1./c_frac, 1./btoc_frac, 1./o_frac])
+        mult_weights = th.tensor([1./(1-b_frac-c_frac), 1./b_frac, 1./c_frac])
         print("Setting positive weight to {}".format(pos_weight))
     else:
         pos_weight = th.tensor([1])
-        mult_weights = th.tensor([1., 1., 1., 1., 1.])
+        mult_weights = th.tensor([1., 1., 1.])
 
     #calculate number of testing, training and validation batches
     test_batches = int(math.ceil(test_len/batch_size))
@@ -138,8 +136,8 @@ def main(argv):
         labeltype = 'bin_labels'
     else:
         loss = nn.CrossEntropyLoss(weight=mult_weights).double().to(device)
-        outfeats = 5
-        cm = np.zeros((5,5),dtype=int)
+        outfeats = 3
+        cm = np.zeros((3,3),dtype=int)
         activation = nn.Softmax(dim=1)
         labeltype = 'mult_labels'
 
@@ -283,11 +281,9 @@ def main(argv):
         neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
         b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
         c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
-        btoc_score_hist = TH1D("Class 3 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
-        o_score_hist = TH1D("Class 4 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
 
         hist_r_list = [neg_r_hist, b_r_hist, c_r_hist, btoc_r_hist, o_r_hist]
-        hist_s_list = [neg_score_hist, b_score_hist, c_score_hist, btoc_score_hist, o_score_hist]
+        hist_s_list = [neg_score_hist, b_score_hist, c_score_hist]
 
     #initialize overall bad events matrix
     bad_events = np.empty((0,3), dtype=np.int)
@@ -332,10 +328,8 @@ def main(argv):
                 neg_score_hist.Fill(pred[i,0])
                 b_score_hist.Fill(pred[i,1])
                 c_score_hist.Fill(pred[i,2])
-                btoc_score_hist.Fill(pred[i,3])
-                o_score_hist.Fill(pred[i,4])
             pred = np.argmax(pred, axis=1).astype(int)
-
+        
         test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
         g_test_list = dgl.unbatch(test_batch)

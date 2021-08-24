@@ -30,14 +30,15 @@ class NodeMLP(nn.Module):
     
     def __init__(self, nodemlp_size, in_features):
         super().__init__()
-        self.lin1 = nn.Linear(in_features, nodemlp_size[0])
-        self.lin2 = nn.Linear(nodemlp_size[0], nodemlp_size[1])
+        self.lin = nn.ModuleList()
+        layer_sizes = [in_features]
+        layer_sizes.extend(nodemlp_size)
+        for i in range(len(layer_sizes)-1):
+            self.lin.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
 
     def forward(self, h):
-        h = self.lin1(h)
-        h = nn.functional.relu(h)
-        h = self.lin2(h)
-        h = nn.functional.relu(h)
+        for layer in self.lin:
+            h = F.relu(layer(h))
         return h
 
 
@@ -45,11 +46,12 @@ class EdgeMLP(nn.Module):
     
     def __init__(self, edgemlp_size, in_features, out_features):
         super().__init__()
-        self.lin1 = nn.Linear(in_features, edgemlp_size[0])
-        self.lin2 = nn.Linear(edgemlp_size[0], edgemlp_size[1])
-        self.lin3 = nn.Linear(edgemlp_size[1], edgemlp_size[2])
-        self.lin4 = nn.Linear(edgemlp_size[2], edgemlp_size[3])
-        self.lin5 = nn.Linear(edgemlp_size[3], out_features)
+        self.lin = nn.ModuleList()
+        layer_sizes = [in_features]
+        layer_sizes.extend(edgemlp_size)
+        layer_sizes.extend([out_features])
+        for i in range(len(layer_sizes)-1):
+            self.lin.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
     
     def apply_edges(self, edges):
         h1_u = edges.src['h1']
@@ -57,15 +59,8 @@ class EdgeMLP(nn.Module):
         h2_u = edges.src['h2']
         h2_v = edges.src['h2']
         h = th.cat([h1_u, h1_v, h2_u, h2_v], 1)
-        h = self.lin1(h)
-        h = th.sigmoid(h)
-        h = self.lin2(h)
-        h = th.sigmoid(h)
-        h = self.lin3(h)
-        h = th.sigmoid(h)
-        h = self.lin4(h)
-        h = th.sigmoid(h)
-        h = self.lin5(h)
+        for layer in self.lin:
+            h = th.sigmoid(layer(h))
         return {'score': h}
     
     def forward(self, g, h1, h2):

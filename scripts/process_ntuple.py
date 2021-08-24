@@ -44,6 +44,8 @@ def main(argv):
     info['event'] = []
     info['jet'] = []
     info['ntracks'] = []
+    info['nbhad'] = []
+    info['nchad'] = []
 
     #jet features
     jfeatures = dict()
@@ -101,6 +103,9 @@ def main(argv):
     labels['flavor'] = [] #track flavor label
     labels['second_ancestor'] = [] #ID of second HF ancestor (only gets determined for B->C tracks)
     labels['algo'] = [] #track association with reco algorithms
+    labels['track_svx'] = []
+    labels['track_svy'] = []
+    labels['track_svz'] = []
 
     total_rem_tracks = total_tracks = total_jets = total_rem_jets = 0
 
@@ -131,6 +136,8 @@ def main(argv):
 
             if i in passed_jets:
                 ntracks = entry.jet_trk_pt[i].size()
+                nbhad = entry.jet_nBHadr[i]
+                nchad = entry.jet_nCHadr[i]
                 rem_trk = 0
 
                 t_pt = []
@@ -169,6 +176,9 @@ def main(argv):
                     t_nPixSplit = []
                     t_nBLSplit = []
 
+                t_svx = []
+                t_svy = []
+                t_svz = []
                 t_ancestor = []
                 t_second_ancestor = []
                 t_flavor = []
@@ -217,7 +227,7 @@ def main(argv):
                         t_algo.append(entry.jet_trk_algo[i][j])
 
                 track_dict, jet_cut_trk = build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut)
-                um_other_tracks = np.array([])
+                um_other_tracks = np.array([]) #unmatched "other" tracks
 
                 #perform track classification
                 for ti in track_dict:
@@ -254,6 +264,9 @@ def main(argv):
                     else:
                         t_flavor.append(0)
                     t_ancestor.append(track_dict[ti].hf_ancestor)
+                    t_svx.append(track_dict[ti].ancestor_vertex[0])
+                    t_svy.append(track_dict[ti].ancestor_vertex[1])
+                    t_svz.append(track_dict[ti].ancestor_vertex[2])
                     t_second_ancestor.append(track_dict[ti].btoc_ancestor)
 
                 total_rem_tracks += rem_trk
@@ -301,12 +314,17 @@ def main(argv):
                 
                 labels['ancestor'].extend(t_ancestor)
                 labels['second_ancestor'].extend(t_second_ancestor)
+                labels['track_svx'].extend(t_svx)
+                labels['track_svy'].extend(t_svy)
+                labels['track_svz'].extend(t_svz)
                 labels['flavor'].extend(t_flavor)
                 labels['algo'].extend(t_algo)
 
                 info['event'].append(ientry)
                 info['jet'].append(i)
                 info['ntracks'].append(rem_trk)
+                info['nbhad'].append(nbhad)
+                info['nchad'].append(nchad)
 
                 total_rem_tracks += rem_trk
                 total_tracks += ntracks

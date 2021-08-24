@@ -34,6 +34,7 @@ class truth_track():
         self.z0 = z0
         self.hf_ancestor = 0 #direct HF ancestor
         self.btoc_ancestor = 0 #bH ancestor for bH->cH tracks from charm hadrons
+        self.ancestor_vertex = np.zeros(3)
         self.classification = ""
 
     def print_track(self,level):
@@ -122,6 +123,7 @@ def build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta
                 min_distance = distance
                 direct_ancestor = ancestor
         track.hf_ancestor = direct_ancestor
+        if ancestors.size: track.ancestor_vertex = particle_dict[direct_ancestor].dv
         track_dict[ti] = track
 
     return track_dict, jet_cut_trk

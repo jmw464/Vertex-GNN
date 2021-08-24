@@ -32,7 +32,7 @@ def main(argv):
     test_outfile_name = data_path+data_name+"_test.bin"
 
     g_list = []
-    ngraphs = ifile = 0
+    ngraphs = 0
     total_true = total_edges = total_b = total_c = total_btoc = total_o = 0
 
     for ntuple in ntuples:
@@ -46,17 +46,10 @@ def main(argv):
             total_true += int(th.sum(graph.edata['bin_labels'][:,0]))
             total_b += int(th.sum(graph.edata['mult_labels'][:,0] == 1))
             total_c += int(th.sum(graph.edata['mult_labels'][:,0] == 2))
-            total_btoc += int(th.sum(graph.edata['mult_labels'][:,0] == 3))
-            total_o += int(th.sum(graph.edata['mult_labels'][:,0] == 4))
             total_edges += list(graph.edata['bin_labels'][:,0].size())[0]
         
-            for i in range(ntracks):
-                graph.ndata['graph_info'][i,0] = ifile
-
             g_list.append(graph)
 
-        ifile += 1        
-    
     random.shuffle(g_list)
 
     #calculate number of features in graphs
@@ -88,8 +81,6 @@ def main(argv):
     paramfile.write(str(total_true/total_edges)+'\n')
     paramfile.write(str(total_b/total_edges)+'\n')
     paramfile.write(str(total_c/total_edges)+'\n')
-    paramfile.write(str(total_btoc/total_edges)+'\n')
-    paramfile.write(str(total_o/total_edges)+'\n')
     paramfile.close()
 
 

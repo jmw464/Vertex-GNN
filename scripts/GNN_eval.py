@@ -24,9 +24,9 @@ def evaluate_confusion_bin(true, pred):
 #evaluate confusion matrix for multi-class case
 def evaluate_confusion_mult(true, pred):
 
-    cm = np.zeros((5,5),dtype=int)
-    for i in range(5):
-        for j in range(5):
+    cm = np.zeros((3,3),dtype=int)
+    for i in range(3):
+        for j in range(3):
             cm[i,j] = np.sum((true[:,0] == i) & (pred[:] == j))
     
     return cm
@@ -44,8 +44,9 @@ def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
         r_threshold = bin_threshold
     else:
         r_array = np.zeros(5)
-        pred = th.argmax(graph.edata['pred']).cpu().detach().numpy().astype(int)
+        pred = np.argmax(graph.edata['pred'].cpu().detach().numpy(), axis=1).astype(int)
         true = graph.edata['mult_labels'].cpu().detach().numpy().astype(int)
+        print(pred)
         cm = evaluate_confusion_mult(true, pred)
         r_threshold = mult_threshold
             
@@ -139,7 +140,7 @@ def compare_vertices(true_vertices, reco_vertices):
 
     vertex_cm = np.zeros((3,3), dtype=int) #no sv, one sv, more than one sv (first index = true, second index = predicted)
     vertex_metrics = []
-    vertex_assoc = np.empty(len(true_vertices), dtype=int)
+    vertex_assoc = np.empty(len(true_vertices), dtype=int) #index is true vertex, entry is reco vertex
     vertex_assoc.fill(-1) #true vertices with -1 have no reco association
 
     #count how many jets were correctly identified as containing an SV
@@ -198,12 +199,10 @@ def print_output(multi_class, cm):
         print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
     else:
         print('\nTesting results:')
-        print('       ||    Pred 0    |    Pred 1    |    Pred 2    |    Pred 3    |    Pred 4    ||  Recall ')
+        print('       ||    Pred 0    |    Pred 1    |    Pred 2    ||  Recall ')
         print('----------------------------------------------------------------------------------------------')
-        print(f'True 0 || {cm[0,0]:12d} | {cm[0,1]:12d} | {cm[0,2]:12d} | {cm[0,3]:12d} | {cm[0,4]:12d} || {cm[0,0]/(cm[0,0]+cm[0,1]+cm[0,2]+cm[0,3]+cm[0,4]):.4f}')
-        print(f'True 1 || {cm[1,0]:12d} | {cm[1,1]:12d} | {cm[1,2]:12d} | {cm[1,3]:12d} | {cm[1,4]:12d} || {cm[1,1]/(cm[1,0]+cm[1,1]+cm[1,2]+cm[1,3]+cm[1,4]):.4f}')
-        print(f'True 2 || {cm[2,0]:12d} | {cm[2,1]:12d} | {cm[2,2]:12d} | {cm[2,3]:12d} | {cm[2,4]:12d} || {cm[2,2]/(cm[2,0]+cm[2,1]+cm[2,2]+cm[2,3]+cm[2,4]):.4f}')
-        print(f'True 3 || {cm[3,0]:12d} | {cm[3,1]:12d} | {cm[3,2]:12d} | {cm[3,3]:12d} | {cm[3,4]:12d} || {cm[3,3]/(cm[3,0]+cm[3,1]+cm[3,2]+cm[3,3]+cm[3,4]):.4f}')
-        print(f'True 4 || {cm[4,0]:12d} | {cm[4,1]:12d} | {cm[4,2]:12d} | {cm[4,3]:12d} | {cm[4,4]:12d} || {cm[4,4]/(cm[4,0]+cm[4,1]+cm[4,2]+cm[4,3]+cm[4,4]):.4f}')
+        print(f'True 0 || {cm[0,0]:12d} | {cm[0,1]:12d} | {cm[0,2]:12d} || {cm[0,0]/(cm[0,0]+cm[0,1]+cm[0,2]):.4f}')
+        print(f'True 1 || {cm[1,0]:12d} | {cm[1,1]:12d} | {cm[1,2]:12d} || {cm[1,1]/(cm[1,0]+cm[1,1]+cm[1,2]):.4f}')
+        print(f'True 2 || {cm[2,0]:12d} | {cm[2,1]:12d} | {cm[2,2]:12d} || {cm[2,2]/(cm[2,0]+cm[2,1]+cm[2,2]):.4f}')
         print('----------------------------------------------------------------------------------------------')
-        print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]+cm[3,0]+cm[4,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]+cm[3,1]+cm[4,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]+cm[3,2]+cm[4,2]):.4f} |       {cm[3,3]/(cm[0,3]+cm[1,3]+cm[2,3]+cm[3,3]+cm[4,3]):.4f} |       {cm[4,4]/(cm[0,4]+cm[1,4]+cm[2,4]+cm[3,4]+cm[4,4]):.4f} ||\n')
+        print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]):.4f} ||\n')

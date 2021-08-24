@@ -75,8 +75,18 @@ def main(argv):
             previous_event = current_event
         current_jet = infile['info']['jet'][ientry]
         ntracks =  infile['info']['ntracks'][ientry]
-        primary_vertex = np.array([infile['efeatures']['event_vx'][event_index], infile['efeatures']['event_vy'][event_index], infile['efeatures']['event_vz'][event_index]])
+        pv_x = infile['efeatures']['event_vx'][event_index]
+        pv_y = infile['efeatures']['event_vx'][event_index]
+        pv_z = infile['efeatures']['event_vx'][event_index]
         nedges = ntracks*(ntracks-1)
+
+        jet_flavor = 0
+        nbhad = infile['info']['nbhad'][ientry]
+        nchad = infile['info']['nchad'][ientry]
+        if nbhad > 0:
+            jet_flavor = 1
+        elif nchad > 0:
+            jet_flavor = 2
 
         #initialize empty arrays
         node_features_base = np.zeros((ntracks,nnfeatures_base))
@@ -84,13 +94,14 @@ def main(argv):
         if incl_hits: node_features_hits = np.zeros((ntracks,nnfeatures_hits))
         if incl_corr: node_features_corrs = np.zeros((ntracks,nnfeatures_corrs))
         #edge_features = np.zeros((nedges,nefeatures)) 
-        node_info = np.zeros((ntracks, 3)) #store event info - file (set in combine_graphs.py), event, jet
+        jet_info = np.zeros((ntracks, 4)) #store jet info - jet truth label (0 = light, 1 = b, 2 = c), jet pv coordinates
+        track_info = np.zeros((ntracks,6))
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
         flavors = np.zeros((ntracks,1))
-        truth_info = np.zeros((ntracks,3))
         bin_labels = np.zeros((nedges,1))
         mult_labels = np.zeros((nedges,1))
+        flavor_labels = np.zeros((nedges,1))
         reco_labels = np.zeros((ntracks,2)) #use of track in SV0, SV1
         
         #read in features
@@ -140,7 +151,10 @@ def main(argv):
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
             second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
-            truth_info[j] = [ancestors[j], second_ancestors[j], flavors[j]]
+            track_svx = infile['labels']['track_svx'][track_offset+j]
+            track_svy = infile['labels']['track_svy'][track_offset+j]
+            track_svz = infile['labels']['track_svz'][track_offset+j]
+            track_info[j] = [ancestors[j], second_ancestors[j], flavors[j], track_svx, track_svy, track_svz]
 
             node_features_base[j] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
             if incl_errors:
@@ -150,7 +164,7 @@ def main(argv):
             if incl_hits:
                 node_features_hits[j] = [track_nPixHits, track_nSCTHits, track_nBLHits, track_nPixHoles, track_nSCTHoles, track_nPixShared, track_nSCTShared, track_nBLShared, track_nPixSplit, track_nBLSplit]
 
-            node_info[j] = [0, current_event, current_jet]
+            jet_info[j] = [jet_flavor, pv_x, pv_y, pv_z]
             reco_labels[j] = [(track_algo & 1 << 2)/4, (track_algo & 1 << 3)/8]
 
         track_offset += ntracks
@@ -168,24 +182,27 @@ def main(argv):
                 if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 1 and flavors[k] == 1: #matching direct ancestors for non secondaries (B to B)
                     bin_labels[counter:counter+2] = 1
                     mult_labels[counter:counter+2] = 1
+                    flavor_labels[counter:counter+2] = 1
                 elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 2 and flavors[k] == 2: #matching direct ancestors for non secondaries (prompt C to prompt C)
                     bin_labels[counter:counter+2] = 1
                     mult_labels[counter:counter+2] = 2
+                    flavor_labels[counter:counter+2] = 2
                 elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 3 and flavors[k] == 3: #matching direct ancestors for non secondaries (B->C to B->C for same C)
                     bin_labels[counter:counter+2] = 1
-                    mult_labels[counter:counter+2] = 3
+                    mult_labels[counter:counter+2] = 1
+                    flavor_labels[counter:counter+2] = 3
                 elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C for different C)
                     bin_labels[counter:counter+2] = incl_btoc
-                    mult_labels[counter:counter+2] = 3*incl_btoc
+                    mult_labels[counter:counter+2] = incl_btoc
+                    flavor_labels[counter:counter+2] = 3*incl_btoc
                 elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or (second_ancestors[j] == ancestors[k] and ancestors[k] > 0): #matching second ancestor and direct ancestor (B to B->C)
                     bin_labels[counter:counter+2] = incl_btoc
-                    mult_labels[counter:counter+2] = 3*incl_btoc
+                    mult_labels[counter:counter+2] = incl_btoc
+                    flavor_labels[counter:counter+2] = 3*incl_btoc
                 elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 0 and flavors[k] == 0: #matching direct ancestors for secondaries (S to S)
-                    mult_labels[counter:counter+2] = 4
+                    flavor_labels[counter:counter+2] = 4
                 elif ancestors[k] == ancestors[j] and ancestors[k] < 0: #matching fake vertices with no HF ancestors
-                    mult_labels[counter:counter+2] = 4
-                else:
-                    mult_labels[counter:counter+2] = 0
+                    flavor_labels[counter:counter+2] = 4
 
                 counter += 2
 
@@ -196,11 +213,12 @@ def main(argv):
             if incl_errors: g.ndata['features_errors'] = th.from_numpy(node_features_errors)
             if incl_hits: g.ndata['features_hits'] = th.from_numpy(node_features_hits)
             if incl_corr: g.ndata['features_corr'] = th.from_numpy(node_features_corrs)
-            g.ndata['graph_info'] = th.from_numpy(node_info)
+            g.ndata['graph_info'] = th.from_numpy(jet_info)
+            g.ndata['node_info'] = th.from_numpy(track_info)
             g.ndata['reco_labels'] = th.from_numpy(reco_labels)
-            g.ndata['truth_info'] = th.from_numpy(truth_info)
             g.edata['bin_labels'] = th.from_numpy(bin_labels)
             g.edata['mult_labels'] = th.from_numpy(mult_labels)
+            g.edata['flavor_labels'] = th.from_numpy(flavor_labels)
             g_list.append(g)
             ngraphs += 1
 

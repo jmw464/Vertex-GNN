@@ -30,7 +30,7 @@ incl_corr = False #include off-diagonal covariance matrix GNN features
 incl_hits = True #include GNN features related to low-level hit information
 
 #neural network options - GNN
-load_checkpoint = True #toggle whether to load previous neural network checkpoint (continue training from previous point)
+load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
 valp = 0.2 #fraction of data reserved for validation
 testp = 0.1 #fraction of data reserved for testing
 
@@ -39,7 +39,7 @@ batch_size = 10000 #number of graphs contained in a single batch for training, t
 learning_rate = 0.001 #learning rate used for neural network training
 
 #neural network evaluation criteria - GNN
-mult_threshold = [0.5, 0.1, 0.1, 0.7, 0.1] #threshold for recall of jets to be marked as bad in multi class classification (none, b, c, b->c, other)
+mult_threshold = [0.5, 0.5, 0.5] #threshold for recall of jets to be marked as bad in multi class classification (none, b, c, b->c, other)
 bin_threshold = [0.5, 0.7] #threshold for recall of jets to be marked as bad in binary classiciation (False, True)
 score_threshold = 0.6 #threshold score for two edges to be associated to a reconstructed secondary vertex
 

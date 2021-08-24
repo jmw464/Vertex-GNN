@@ -1,14 +1,14 @@
 #!/bin/bash
 
-RUN=25
+RUN=27
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATA=btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
+DATA=test_sample #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
 
-EPOCHS=50
+EPOCHS=10
 
 NORMED=1
-MULTICLASS=0
+MULTICLASS=1
 
 #create output directory if not already there
 if [ ! -d ${OUTPUTDIR}${RUN}/ ]
