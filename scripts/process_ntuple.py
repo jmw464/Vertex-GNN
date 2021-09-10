@@ -44,8 +44,7 @@ def main(argv):
     info['event'] = []
     info['jet'] = []
     info['ntracks'] = []
-    info['nbhad'] = []
-    info['nchad'] = []
+    info['jet_flavor'] = []
 
     #jet features
     jfeatures = dict()
@@ -136,8 +135,7 @@ def main(argv):
 
             if i in passed_jets:
                 ntracks = entry.jet_trk_pt[i].size()
-                nbhad = entry.jet_nBHadr[i]
-                nchad = entry.jet_nCHadr[i]
+                jet_flavor = entry.jet_LabDr_HadF[i]
                 rem_trk = 0
 
                 t_pt = []
@@ -269,8 +267,6 @@ def main(argv):
                     t_svz.append(track_dict[ti].ancestor_vertex[2])
                     t_second_ancestor.append(track_dict[ti].btoc_ancestor)
 
-                total_rem_tracks += rem_trk
-
                 #write events
                 jfeatures['pt'].append(entry.jet_pt[i])
                 jfeatures['eta'].append(entry.jet_eta[i])
@@ -323,8 +319,7 @@ def main(argv):
                 info['event'].append(ientry)
                 info['jet'].append(i)
                 info['ntracks'].append(rem_trk)
-                info['nbhad'].append(nbhad)
-                info['nchad'].append(nchad)
+                info['jet_flavor'].append(jet_flavor)
 
                 total_rem_tracks += rem_trk
                 total_tracks += ntracks

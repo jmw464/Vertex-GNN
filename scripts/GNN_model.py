@@ -59,8 +59,9 @@ class EdgeMLP(nn.Module):
         h2_u = edges.src['h2']
         h2_v = edges.src['h2']
         h = th.cat([h1_u, h1_v, h2_u, h2_v], 1)
-        for layer in self.lin:
-            h = th.sigmoid(layer(h))
+        for i, layer in enumerate(self.lin):
+            if i != 0: h = th.sigmoid(h)
+            h = layer(h)
         return {'score': h}
     
     def forward(self, g, h1, h2):

@@ -46,7 +46,6 @@ def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
         r_array = np.zeros(5)
         pred = np.argmax(graph.edata['pred'].cpu().detach().numpy(), axis=1).astype(int)
         true = graph.edata['mult_labels'].cpu().detach().numpy().astype(int)
-        print(pred)
         cm = evaluate_confusion_mult(true, pred)
         r_threshold = mult_threshold
             

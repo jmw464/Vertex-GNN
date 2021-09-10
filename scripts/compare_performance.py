@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+#DEFINITIONS
+#Algorithmic efficiency = Number of b/c jets with correctly reconstructed SV / Number of b/c jets with "reconstructable" SV (only calculated for jets with 1 "reconstructable SV")
+#Algorithmic fake rate = Number of jets with falsely reconstructed SV / Number of jets with reconstructed SV (only calculated for jets with 1 "reconstructable SV")
+#Physics efficiency = Number of b/c jets with reconstructed SV / Number of b/c jets
+#Physics fake rate = Number of l jets with reconstructed SV / Number of jets with reconstructed SV
+
 import matplotlib as mpl
 mpl.use('Agg')
 
@@ -97,30 +103,6 @@ def main(argv):
     no_true_sv_hist_b = TH1D("no_true_sv_b", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
     no_true_sv_hist_btoc = TH1D("no_true_sv_btoc", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
 
-    sv1_pt_profile_eff_c = TProfile("sv1_pt_eff_c", "SV reconstruction efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
-    gnn_pt_profile_eff_c = TProfile("gnn_pt_eff_c", "SV reconstruction efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
-    sv1_eta_profile_eff_c = TProfile("sv1_eta_eff_c", "SV reconstruction efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    gnn_eta_profile_eff_c = TProfile("gnn_eta_eff_c", "SV reconstruction efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    sv1_pt_profile_eff_b = TProfile("sv1_pt_eff_b", "SV reconstruction efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
-    gnn_pt_profile_eff_b = TProfile("gnn_pt_eff_b", "SV reconstruction efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
-    sv1_eta_profile_eff_b = TProfile("sv1_eta_eff_b", "SV reconstruction efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    gnn_eta_profile_eff_b = TProfile("gnn_eta_eff_b", "SV reconstruction efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-
-    sv1_lxy_profile_eff_c = TProfile("sv1_lxy_eff_c", "SV reconstruction efficiency for c jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
-    gnn_lxy_profile_eff_c = TProfile("gnn_lxy_eff_c", "SV reconstruction efficiency for c jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
-    sv1_lxy_profile_eff_b = TProfile("sv1_lxy_eff_b", "SV reconstruction efficiency for b jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
-    gnn_lxy_profile_eff_b = TProfile("gnn_lxy_eff_b", "SV reconstruction efficiency for b jets as a function of Lxy;Lxy [cm];Efficiency",20,0,100)
-
-    sv1_ntrk_profile_eff_c = TProfile("sv1_ntrk_eff_c", "SV reconstruction efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_eff_c = TProfile("gnn_ntrk_eff_c", "SV reconstruction efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    sv1_ntrk_profile_eff_b = TProfile("sv1_ntrk_eff_b", "SV reconstruction efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_eff_b = TProfile("gnn_ntrk_eff_b", "SV reconstruction efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-
-    sv1_pt_profile_fr = TProfile("sv1_pt_fr", "SV reconstruction fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
-    gnn_pt_profile_fr = TProfile("gnn_pt_fr", "SV reconstruction fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
-    sv1_eta_profile_fr = TProfile("sv1_eta_fr", "SV reconstruction fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
-    gnn_eta_profile_fr = TProfile("gnn_eta_fr", "SV reconstruction fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
-   
     sv1_pt_profile_corrp_c = TProfile("sv1_pt_corrp_c", "Fraction of tracks from true SV in predicted SV for c jets as a function of jet pT;pT [GeV];Fraction of correct tracks",20,jet_pt_bound[0],jet_pt_bound[1])
     gnn_pt_profile_corrp_c = TProfile("gnn_pt_corrp_c", "Fraction of tracks from true SV in predicted SV for c jets as a function of jet pT;pT [GeV];Fraction of correct tracks",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_corrp_c = TProfile("sv1_eta_corrp_c", "Fraction of tracks from true SV in predicted SV for c jets as a function of jet eta;eta;Fraction of correct tracks",20,jet_eta_bound[0],jet_eta_bound[1])
@@ -139,13 +121,54 @@ def main(argv):
     sv1_eta_profile_fakep_b = TProfile("sv1_eta_fakep_b", "Fraction of tracks in predicted SV not found in true SV for b jets as a function of jet eta;eta;Fraction of false tracks",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_fakep_b = TProfile("gnn_eta_fakep_b", "Fraction of tracks in predicted SV not found in true SV for b jets as a function of jet eta;eta;Fraction of false tracks",20,jet_eta_bound[0],jet_eta_bound[1])
 
+    sv1_pt_profile_alg_eff_c = TProfile("sv1_pt_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_alg_eff_c = TProfile("gnn_pt_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_alg_eff_c = TProfile("sv1_eta_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_alg_eff_c = TProfile("gnn_eta_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    sv1_pt_profile_alg_eff_b = TProfile("sv1_pt_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_alg_eff_b = TProfile("gnn_pt_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_alg_eff_b = TProfile("sv1_eta_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_alg_eff_b = TProfile("gnn_eta_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    sv1_ntrk_profile_alg_eff_c = TProfile("sv1_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_alg_eff_c = TProfile("gnn_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_ntrk_profile_alg_eff_b = TProfile("sv1_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_alg_eff_b = TProfile("gnn_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_lxy_profile_alg_eff_c = TProfile("sv1_lxy_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
+    gnn_lxy_profile_alg_eff_c = TProfile("gnn_lxy_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
+    sv1_lxy_profile_alg_eff_b = TProfile("sv1_lxy_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
+    gnn_lxy_profile_alg_eff_b = TProfile("gnn_lxy_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
+
+    sv1_pt_profile_phys_eff_c = TProfile("sv1_pt_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_phys_eff_c = TProfile("gnn_pt_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_phys_eff_c = TProfile("sv1_eta_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_phys_eff_c = TProfile("gnn_eta_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    sv1_pt_profile_phys_eff_b = TProfile("sv1_pt_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_phys_eff_b = TProfile("gnn_pt_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_phys_eff_b = TProfile("sv1_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_phys_eff_b = TProfile("gnn_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
+    sv1_ntrk_profile_phys_eff_c = TProfile("sv1_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_phys_eff_c = TProfile("gnn_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_ntrk_profile_phys_eff_b = TProfile("sv1_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    gnn_ntrk_profile_phys_eff_b = TProfile("gnn_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+
+    sv1_pt_profile_alg_fr = TProfile("sv1_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_alg_fr = TProfile("gnn_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_alg_fr = TProfile("sv1_eta_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_alg_fr = TProfile("gnn_eta_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
+   
+    sv1_pt_profile_phys_fr = TProfile("sv1_pt_phys_fr", "SV reconstruction physics fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
+    gnn_pt_profile_phys_fr = TProfile("gnn_pt_phys_fr", "SV reconstruction physics fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
+    sv1_eta_profile_phys_fr = TProfile("sv1_eta_phys_fr", "SV reconstruction physics fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
+    gnn_eta_profile_phys_fr = TProfile("gnn_eta_phys_fr", "SV reconstruction physics fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
+    
     hist_pc_list = [sv1_corrp_hist, gnn_corrp_hist]
     hist_pf_list = [sv1_fakep_hist, gnn_fakep_hist]
 
     #initialize matrices for overall SV predictions and plots
     gnn_cm = np.zeros((3,3), dtype=int)
     sv1_cm = np.zeros((3,3), dtype=int)
-    b_tot = b_found_gnn = b_found_sv1 = c_tot = c_found_gnn = c_found_sv1 = no_sv_tot = fake_found_gnn = fake_found_sv1 = tot_pred_gnn = tot_pred_sv1 = 0
+    b_tot_alg = b_found_gnn_alg = b_found_sv1_alg = c_tot_alg = c_found_gnn_alg = c_found_sv1_alg = fake_found_gnn_alg = fake_found_sv1_alg = tot_pred_gnn_alg = tot_pred_sv1_alg = 0
+    b_tot_phys = b_found_gnn_phys = b_found_sv1_phys = c_tot_phys = c_found_gnn_phys = c_found_sv1_phys = fake_found_gnn_phys = fake_found_sv1_phys = tot_pred_gnn_phys = tot_pred_sv1_phys = 0
 
     #evaluate run statistics
     for ibatch in range(batches):
@@ -165,6 +188,8 @@ def main(argv):
             gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
             true_vertices = find_vertices_bin(g, 'truth', score_threshold)
             sv1_vertex = np.argwhere(g.ndata['reco_labels'].cpu().numpy().astype(int)[:,1]).flatten()
+            jet_flavor = g.ndata['graph_info'].cpu().numpy().astype(int)[0,0]
+            ntrk = g.num_nodes()
             if sv1_vertex.size > 0: sv1_vertex = [sv1_vertex]
 
             jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
@@ -172,7 +197,7 @@ def main(argv):
             gnn_cm += jet_gnn_cm
             sv1_cm += jet_sv1_cm
 
-            pv = np.array([g.ndata['graph_info'][0,1], g.ndata['graph_info'][0,2], g.ndata['graph_info'][0,3]])
+            pv_coord = np.array([g.ndata['graph_info'][0,1], g.ndata['graph_info'][0,2], g.ndata['graph_info'][0,3]])
             jet_pt = g.ndata['features_base'][0,5]
             jet_eta = g.ndata['features_base'][0,6]
             if norm:
@@ -186,22 +211,14 @@ def main(argv):
                 true_vertex = true_vertices[i]
                 edge_id = g.edge_id(true_vertex[0],true_vertex[1])
 
-                sv = np.array([g.ndata['node_info'][true_vertex[0],3], g.ndata['node_info'][true_vertex[0],4], g.ndata['node_info'][true_vertex[0],5]])
-                Lxy = np.linalg.norm(pv-sv)
+                sv_coord = np.array([g.ndata['node_info'][true_vertex[0],3], g.ndata['node_info'][true_vertex[0],4], g.ndata['node_info'][true_vertex[0],5]])
+                Lxy = np.linalg.norm(pv_coord-sv_coord)
                 vertex_flavor = g.edata['mult_labels'][edge_id]
-                ntrk = g.num_nodes()
                 if vertex_flavor == 1:
                     no_b += 1
                 elif vertex_flavor == 2:
                     no_c += 1
-
-                if vertex_flavor == 2:
-                    gnn_lxy_profile_eff_c.Fill(Lxy,int(gnn_vertex_assoc[i]>=0))
-                    sv1_lxy_profile_eff_c.Fill(Lxy,int(sv1_vertex_assoc[i]>=0))
-                elif vertex_flavor == 1:
-                    gnn_lxy_profile_eff_b.Fill(Lxy,int(gnn_vertex_assoc[i]>=0))
-                    sv1_lxy_profile_eff_b.Fill(Lxy,int(sv1_vertex_assoc[i]>=0))
-                
+                                    
                 if gnn_vertex_assoc[i] >= 0:
                     index = gnn_vertex_assoc[i]
                     if vertex_flavor == 2:
@@ -231,44 +248,77 @@ def main(argv):
             if no_b > 0: no_true_sv_hist_b.Fill(no_b)
             if no_c > 0: no_true_sv_hist_c.Fill(no_c)
 
-            #fill histograms for b SVs
-            if no_b > 0:
-                b_tot += 1
-                b_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
-                b_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
-                sv1_pt_profile_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_pt_profile_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-                sv1_eta_profile_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_eta_profile_eff_b .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-                sv1_ntrk_profile_eff_b.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_ntrk_profile_eff_b.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2])) 
+            #fill algorithmic efficiency histograms for b/c-jets (only jets with exactly 1 true SV)
+            if no_b == 1 and no_c == 0:
+                b_tot_alg += 1
+                b_found_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]
+                b_found_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
+                sv1_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+            elif no_c == 1 and no_b == 0:
+                c_tot_alg += 1
+                c_found_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]
+                c_found_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
+                sv1_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+                sv1_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
+                gnn_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
 
-            #fill histograms for c SVs
-            if no_c > 0 and no_b == 0:
-                c_tot += 1
-                c_found_sv1 += jet_sv1_cm[1,1]+jet_sv1_cm[2,2]
-                c_found_gnn += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
-                sv1_pt_profile_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_pt_profile_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-                sv1_eta_profile_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_eta_profile_eff_c .Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
-                sv1_ntrk_profile_eff_c.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[2,2]))
-                gnn_ntrk_profile_eff_c.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[2,2]))
+            #fill algorithmic fake rate histograms (only jets with exactly 1 true SV)
+            if (jet_sv1_cm[0,1]+jet_sv1_cm[0,2]+jet_sv1_cm[1,1]+jet_sv1_cm[1,2]) == 1:
+                tot_pred_sv1_alg += 1
+                fake_found_sv1_alg += float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2])
+                sv1_pt_profile_alg_fr.Fill(jet_pt, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
+                sv1_eta_profile_alg_fr.Fill(jet_eta, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
+            if (jet_gnn_cm[0,1]+jet_gnn_cm[0,2]+jet_gnn_cm[1,1]+jet_gnn_cm[1,2]) == 1:
+                tot_pred_gnn_alg += 1
+                fake_found_gnn_alg += float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])
+                gnn_pt_profile_alg_fr.Fill(jet_pt, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2]))
+                gnn_eta_profile_alg_fr.Fill(jet_eta, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])) 
 
-            if no_c == 0 and no_b == 0:
-                no_sv_tot += 1
-                fake_found_sv1 += (1-jet_sv1_cm[0,0])
-                fake_found_gnn += (1-jet_gnn_cm[0,0])
-
-            if np.sum(jet_sv1_cm[:,1]+jet_sv1_cm[:,2]) > 0:
-                tot_pred_sv1 += 1
-                sv1_pt_profile_fr.Fill(jet_pt, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
-                sv1_eta_profile_fr.Fill(jet_eta, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
-
-            if np.sum(jet_gnn_cm[:,1]+jet_gnn_cm[:,2]) > 0:
-                tot_pred_gnn += 1
-                gnn_pt_profile_fr.Fill(jet_pt, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2]))
-                gnn_eta_profile_fr .Fill(jet_eta, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])) 
+            #fill physics efficiency histograms for b/c-jets
+            if jet_flavor == 1:
+                b_tot_phys += 1
+                b_found_sv1_phys += float(len(sv1_vertex) != 0)
+                b_found_gnn_phys += float(len(gnn_vertices) != 0)
+                sv1_pt_profile_phys_eff_b.Fill(jet_pt, float(len(sv1_vertex) != 0))
+                gnn_pt_profile_phys_eff_b.Fill(jet_pt, float(len(gnn_vertices) != 0))
+                sv1_eta_profile_phys_eff_b.Fill(jet_eta, float(len(sv1_vertex) != 0))
+                gnn_eta_profile_phys_eff_b.Fill(jet_eta, float(len(gnn_vertices) != 0))
+                sv1_ntrk_profile_phys_eff_b.Fill(ntrk, float(len(sv1_vertex) != 0))
+                gnn_ntrk_profile_phys_eff_b.Fill(ntrk, float(len(gnn_vertices) != 0))
+            elif jet_flavor == 2:
+                c_tot_phys += 1
+                c_found_sv1_phys += float(len(sv1_vertex) != 0)
+                c_found_gnn_phys += float(len(gnn_vertices) != 0)
+                sv1_pt_profile_phys_eff_c.Fill(jet_pt, float(len(sv1_vertex) != 0))
+                gnn_pt_profile_phys_eff_c.Fill(jet_pt, float(len(gnn_vertices) != 0))
+                sv1_eta_profile_phys_eff_c.Fill(jet_eta, float(len(sv1_vertex) != 0))
+                gnn_eta_profile_phys_eff_c.Fill(jet_eta, float(len(gnn_vertices) != 0))
+                sv1_ntrk_profile_phys_eff_c.Fill(ntrk, float(len(sv1_vertex) != 0))
+                gnn_ntrk_profile_phys_eff_c.Fill(ntrk, float(len(gnn_vertices) != 0))
+                        
+            #fill physics fake rate histograms
+            if (float(len(sv1_vertex) > 0)):
+                tot_pred_sv1_phys += 1
+                fake_found_sv1_phys += float(jet_flavor == 0)
+                sv1_pt_profile_phys_fr.Fill(jet_pt, float(jet_flavor == 0))
+                sv1_eta_profile_phys_fr.Fill(jet_eta, float(jet_flavor == 0))
+            if (float(len(gnn_vertices) > 0)):
+                tot_pred_gnn_phys += 1
+                fake_found_gnn_phys += float(jet_flavor == 0)
+                gnn_pt_profile_phys_fr.Fill(jet_pt, float(jet_flavor == 0))
+                gnn_eta_profile_phys_fr.Fill(jet_eta, float(jet_flavor == 0))
 
             for vertex_metric in gnn_vertex_metrics:
                 hist_pc_list[1].Fill(vertex_metric[0])
@@ -286,16 +336,31 @@ def main(argv):
     print(f'Actual >1 SV || {gnn_cm[2,0]:5} /{sv1_cm[2,0]:6} | {gnn_cm[2,1]:5} /{sv1_cm[2,1]:6} | {gnn_cm[2,2]:5} /{sv1_cm[2,2]:6} |')
     print('---------------------------------------------------------------')
     print(f'Edge score threshold: {score_threshold}')
-    print(f'Global b-jet vertex efficiency: {b_found_gnn/b_tot:4} (GNN), {b_found_sv1/b_tot:4} (SV1)')
-    print(f'Global c-jet vertex efficiency: {c_found_gnn/c_tot:4} (GNN), {c_found_sv1/c_tot:4} (SV1)')
-    print(f'Global vertex fake rate: {fake_found_gnn/tot_pred_gnn:4} (GNN), {fake_found_sv1/tot_pred_sv1:4} (SV1)')
+    print(f'Global algorithmic b-jet efficiency: {b_found_gnn_alg/b_tot_alg:4} (GNN), {b_found_sv1_alg/b_tot_alg:4} (SV1)')
+    print(f'Global algorithmic c-jet efficiency: {c_found_gnn_alg/c_tot_alg:4} (GNN), {c_found_sv1_alg/c_tot_alg:4} (SV1)')
+    print(f'Global algorithmic fake rate: {fake_found_gnn_alg/tot_pred_gnn_alg:4} (GNN), {fake_found_sv1_alg/tot_pred_sv1_alg:4} (SV1)')
+    print(f'Global physics b-jet efficiency: {b_found_gnn_phys/b_tot_phys:4} (GNN), {b_found_sv1_phys/b_tot_phys:4} (SV1)')
+    print(f'Global physics c-jet efficiency: {c_found_gnn_phys/c_tot_phys:4} (GNN), {c_found_sv1_phys/c_tot_phys:4} (SV1)')
+    print(f'Global physics fake rate: {fake_found_gnn_phys/tot_pred_gnn_phys:4} (GNN), {fake_found_sv1_phys/tot_pred_sv1_phys:4} (SV1)')
 
-    plot_profile([sv1_pt_profile_eff_c, gnn_pt_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_c.png")
-    plot_profile([sv1_pt_profile_eff_b, gnn_pt_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_pt_b.png")
-    plot_profile([sv1_eta_profile_eff_c, gnn_eta_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_eta_c.png")
-    plot_profile([sv1_eta_profile_eff_b, gnn_eta_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_eta_b.png")
-    plot_profile([sv1_pt_profile_fr, gnn_pt_profile_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fr_pt.png")
-    plot_profile([sv1_eta_profile_fr, gnn_eta_profile_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fr_eta.png")
+    plot_profile([sv1_pt_profile_alg_eff_c, gnn_pt_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_pt_c.png")
+    plot_profile([sv1_pt_profile_alg_eff_b, gnn_pt_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_pt_b.png")
+    plot_profile([sv1_eta_profile_alg_eff_c, gnn_eta_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_eta_c.png")
+    plot_profile([sv1_eta_profile_alg_eff_b, gnn_eta_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_eta_b.png")
+    plot_profile([sv1_lxy_profile_alg_eff_b, gnn_lxy_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_lxy_b.png")
+    plot_profile([sv1_lxy_profile_alg_eff_c, gnn_lxy_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_lxy_c.png")
+    plot_profile([sv1_ntrk_profile_alg_eff_b, gnn_ntrk_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_ntrk_b.png")
+    plot_profile([sv1_ntrk_profile_alg_eff_c, gnn_ntrk_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_ntrk_c.png")
+    plot_profile([sv1_pt_profile_phys_eff_c, gnn_pt_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_pt_c.png")
+    plot_profile([sv1_pt_profile_phys_eff_b, gnn_pt_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_pt_b.png")
+    plot_profile([sv1_eta_profile_phys_eff_c, gnn_eta_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_eta_c.png")
+    plot_profile([sv1_eta_profile_phys_eff_b, gnn_eta_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_eta_b.png")
+    plot_profile([sv1_ntrk_profile_phys_eff_b, gnn_ntrk_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_ntrk_b.png")
+    plot_profile([sv1_ntrk_profile_phys_eff_c, gnn_ntrk_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_ntrk_c.png")
+    plot_profile([sv1_pt_profile_alg_fr, gnn_pt_profile_alg_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_fr_pt.png")
+    plot_profile([sv1_eta_profile_alg_fr, gnn_eta_profile_alg_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_fr_eta.png")
+    plot_profile([sv1_pt_profile_phys_fr, gnn_pt_profile_phys_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_fr_pt.png")
+    plot_profile([sv1_eta_profile_phys_fr, gnn_eta_profile_phys_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_fr_eta.png")
     plot_profile([sv1_pt_profile_corrp_c, gnn_pt_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_c.png")
     plot_profile([sv1_pt_profile_corrp_b, gnn_pt_profile_corrp_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_b.png")
     plot_profile([sv1_eta_profile_corrp_c, gnn_eta_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_eta_c.png")
@@ -304,25 +369,23 @@ def main(argv):
     plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_b.png")
     plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_c.png")
     plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_b.png")
-    plot_profile([sv1_lxy_profile_eff_b, gnn_lxy_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_lxy_b.png")
-    plot_profile([sv1_lxy_profile_eff_c, gnn_lxy_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_lxy_c.png")
-    plot_profile([sv1_ntrk_profile_eff_b, gnn_ntrk_profile_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_ntrk_b.png")
-    plot_profile([sv1_ntrk_profile_eff_c, gnn_ntrk_profile_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_eff_ntrk_c.png")
 
     ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]
     for i in range(len(hist_list_list)):
         plot_metric_hist(hist_list_list[i], [0.0,1.4], outfile_name+ext[i])
 
-    canv1 = TCanvas("c1", "c1", 800, 600)
-
     #evaluate roc data
     if plot_roc:
         score_threshold_array = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        c_efficiency = np.zeros(len(score_threshold_array))
-        b_efficiency = np.zeros(len(score_threshold_array))
-        fake_rate_num = np.zeros(len(score_threshold_array))
-        fake_rate_denom = np.zeros(len(score_threshold_array))
+        c_alg_efficiency = np.zeros(len(score_threshold_array))
+        b_alg_efficiency = np.zeros(len(score_threshold_array))
+        alg_fake_rate_num = np.zeros(len(score_threshold_array))
+        alg_fake_rate_denom = np.zeros(len(score_threshold_array))
+        c_phys_efficiency = np.zeros(len(score_threshold_array))
+        b_phys_efficiency = np.zeros(len(score_threshold_array))
+        phys_fake_rate_num = np.zeros(len(score_threshold_array))
+        phys_fake_rate_denom = np.zeros(len(score_threshold_array))
 
         for ibatch in range(batches):
             #calculate batch indices
@@ -340,6 +403,7 @@ def main(argv):
                 score_threshold = score_threshold_array[ist]
 
                 for g in g_list:
+                    jet_flavor = g.ndata['graph_info'].cpu().numpy().astype(int)[0,0]
                     gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
                     true_vertices = find_vertices_bin(g, 'truth', score_threshold)
                     jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
@@ -354,63 +418,54 @@ def main(argv):
                         elif vertex_flavor == 2:
                             no_c += 1
 
-                    #fill histograms for b SVs
-                    if no_b > 0:
-                        b_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+                    #fill algorithmic efficiency for b/c-jets (only jets with exactly 1 true SV)
+                    if no_b == 1 and no_c == 0:
+                        b_alg_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
+                    elif no_c == 1 and no_b == 0:
+                        c_alg_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
 
-                    #fill histograms for c SVs
-                    if no_c > 0 and no_b == 0:
-                        c_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[2,2]
+                    #fill algorithmic fake rate histograms (only jets with exactly 1 true SV)
+                    if (jet_gnn_cm[0,1]+jet_gnn_cm[0,2]+jet_gnn_cm[1,1]+jet_gnn_cm[1,2]) == 1:
+                        alg_fake_rate_num[ist] += jet_gnn_cm[0,1]+jet_gnn_cm[0,2]
+                        alg_fake_rate_denom[ist] += 1
 
-                    if no_c == 0 and no_b == 0:
-                        fake_rate_num[ist] += (1-jet_gnn_cm[0,0])
+                    #fill physics efficiency histograms for b/c-jets
+                    if jet_flavor == 1:
+                        b_phys_efficiency[ist] += float(len(gnn_vertices) != 0)
+                    elif jet_flavor == 2:
+                        c_phys_efficiency[ist] += float(len(gnn_vertices) != 0)
 
-                    fake_rate_denom[ist] += (1-np.sum(jet_gnn_cm[:,0]))
+                    if (float(len(gnn_vertices) > 0)):
+                        phys_fake_rate_denom[ist] += 1
+                        phys_fake_rate_num[ist] += float(jet_flavor == 0)
 
-        b_efficiency = b_efficiency/b_tot
-        c_efficiency = c_efficiency/c_tot
-        fake_rate = np.divide(fake_rate_num,fake_rate_denom)
-        sv1_b_efficiency = np.array([b_found_sv1/b_tot])
-        sv1_c_efficiency = np.array([c_found_sv1/c_tot])
-        sv1_fake_rate = np.array([fake_found_sv1/tot_pred_sv1])
+        b_alg_efficiency = b_alg_efficiency/b_tot_alg
+        c_alg_efficiency = c_alg_efficiency/c_tot_alg
+        alg_fake_rate = np.divide(alg_fake_rate_num,alg_fake_rate_denom)
+        sv1_b_alg_efficiency = np.array([b_found_sv1_alg/b_tot_alg])
+        sv1_c_alg_efficiency = np.array([c_found_sv1_alg/c_tot_alg])
+        sv1_alg_fake_rate = np.array([fake_found_sv1_alg/tot_pred_sv1_alg])
 
-        mg = TMultiGraph()
-        roc_curve_b = TGraph(len(score_threshold_array), b_efficiency, fake_rate)
-        roc_curve_c = TGraph(len(score_threshold_array), c_efficiency, fake_rate)
-        sv1_eff_b = TGraph(1, sv1_b_efficiency, sv1_fake_rate)
-        sv1_eff_c = TGraph(1, sv1_c_efficiency, sv1_fake_rate)
-        roc_curve_b.SetLineColor(1)
-        roc_curve_c.SetLineColor(4)
-        sv1_eff_b.SetLineColor(1)
-        sv1_eff_c.SetLineColor(4)
-        roc_curve_b.SetMarkerColor(1)
-        roc_curve_c.SetMarkerColor(4)
-        sv1_eff_b.SetMarkerColor(1)
-        sv1_eff_c.SetMarkerColor(4)
-        roc_curve_b.SetMarkerStyle(20)
-        roc_curve_c.SetMarkerStyle(20)
-        sv1_eff_b.SetMarkerStyle(22)
-        sv1_eff_c.SetMarkerStyle(22)
-        mg.Add(roc_curve_b)
-        mg.Add(roc_curve_c)
-        mg.Add(sv1_eff_b)
-        mg.Add(sv1_eff_c)
-        mg.SetTitle("; Efficiency; Fake rate")
-        mg.Draw("ALP")
-        mg.GetXaxis().SetLimits(0.7,1.)
-        mg.SetMinimum(0.)
-        mg.SetMaximum(0.5)
-        legend = TLegend(0.15,0.88-0.08*4,0.3,0.88,'','NDC')
-        legend.AddEntry(roc_curve_b, "b-jets (GNN)","lp")
-        legend.AddEntry(roc_curve_c, "c-jets (GNN)","lp")
-        legend.AddEntry(sv1_eff_b, "b-jets (SV1)","p")
-        legend.AddEntry(sv1_eff_c, "c-jets (SV1)","p")
-        legend.SetTextSize(0.025)
-        legend.SetFillStyle(0)
-        legend.SetBorderSize(0)
-        legend.Draw("SAME")
-        canv1.SaveAs(outfile_name+"_roc.png")
-        canv1.Clear()
+        b_phys_efficiency = b_phys_efficiency/b_tot_phys
+        c_phys_efficiency = c_phys_efficiency/c_tot_phys
+        phys_fake_rate = np.divide(phys_fake_rate_num,phys_fake_rate_denom)
+        sv1_b_phys_efficiency = np.array([b_found_sv1_phys/b_tot_phys])
+        sv1_c_phys_efficiency = np.array([c_found_sv1_phys/c_tot_phys])
+        sv1_phys_fake_rate = np.array([fake_found_sv1_phys/tot_pred_sv1_phys])
+
+        alg_roc_curve_b = TGraph(len(b_alg_efficiency), b_alg_efficiency, alg_fake_rate)
+        alg_roc_curve_c = TGraph(len(c_alg_efficiency), c_alg_efficiency, alg_fake_rate)
+        sv1_alg_eff_b = TGraph(len(sv1_b_alg_efficiency), sv1_b_alg_efficiency, sv1_alg_fake_rate)
+        sv1_alg_eff_c = TGraph(len(sv1_c_alg_efficiency), sv1_c_alg_efficiency, sv1_alg_fake_rate)
+        plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, "algorithmic", outfile_name+"_a_roc.png")
+
+        phys_roc_curve_b = TGraph(len(b_phys_efficiency), b_phys_efficiency, phys_fake_rate)
+        phys_roc_curve_c = TGraph(len(c_phys_efficiency), c_phys_efficiency, phys_fake_rate)
+        sv1_phys_eff_b = TGraph(len(sv1_b_phys_efficiency), sv1_b_phys_efficiency, sv1_phys_fake_rate)
+        sv1_phys_eff_c = TGraph(len(sv1_c_phys_efficiency), sv1_c_phys_efficiency, sv1_phys_fake_rate)
+        plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, "physics", outfile_name+"_p_roc.png")
+
+    canv1 = TCanvas("c1", "c1", 800, 600)
 
     gStyle.SetOptStat(0)
     gPad.SetLogy()

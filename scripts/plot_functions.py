@@ -1,7 +1,8 @@
 import os,sys,math,ROOT,glob
 import numpy as np
 import argparse
-from ROOT import TFile, TH1D, TH1I, gROOT, TCanvas, gStyle, gPad, TLegend, TGaxis, THStack
+import matplotlib.pyplot as plt
+from ROOT import TFile, TH1D, TH1I, gROOT, TCanvas, gStyle, gPad, TLegend, TGaxis, THStack, TMultiGraph
 
 
 #plot list of histograms with specified labels - scaling draws second axis shifted by -scaling[0] and scaled by 1/scaling[1]
@@ -160,6 +161,63 @@ def plot_profile(profile_list, labels, ylimit, overflow, filename):
     legend.SetFillStyle(0)
     legend.SetBorderSize(0)
     legend.Draw("same")
+    canv.SaveAs(filename)
+    canv.Clear()
+    del canv
+
+
+def plot_confusion_matrix(conf_matrix, xlabels, ylabels, title, axis_labels, filename):
+    fig, ax = plt.subplots(figsize=(7.5, 7.5))
+    xlab = [""]
+    xlab.extend(xlabels)
+    ylab = [""]
+    ylab.extend(ylabels)
+    ax.matshow(conf_matrix, cmap=plt.cm.Blues, alpha=0.3)
+    ax.set_xticklabels(xlab)
+    ax.set_yticklabels(ylab)
+    for i in range(conf_matrix.shape[0]):
+        for j in range(conf_matrix.shape[1]):
+            ax.text(x=j, y=i,s=conf_matrix[i, j], va='center', ha='center', size='xx-large')
+ 
+    plt.xlabel(axis_labels[0], fontsize=18)
+    plt.ylabel(axis_labels[1], fontsize=18)
+    plt.title(title, fontsize=18)
+    plt.savefig(filename)
+
+
+def plot_roc_curve(roc_b, roc_c, comp_roc_b, comp_roc_c, type, filename):
+    canv = TCanvas("c1", "c1", 800, 600)
+    mg = TMultiGraph()
+    roc_b.SetLineColor(1)
+    roc_c.SetLineColor(4)
+    comp_roc_b.SetLineColor(1)
+    comp_roc_c.SetLineColor(4)
+    roc_b.SetMarkerColor(1)
+    roc_c.SetMarkerColor(4)
+    comp_roc_b.SetMarkerColor(1)
+    comp_roc_c.SetMarkerColor(4)
+    roc_b.SetMarkerStyle(20)
+    roc_c.SetMarkerStyle(20)
+    comp_roc_b.SetMarkerStyle(22)
+    comp_roc_c.SetMarkerStyle(22)
+    mg.Add(roc_b)
+    mg.Add(roc_c)
+    mg.Add(comp_roc_b)
+    mg.Add(comp_roc_c)
+    mg.SetTitle("; "+ type +" efficiency; " + type + " fake rate")
+    mg.Draw("ALP")
+    mg.GetXaxis().SetLimits(0.5,1.)
+    mg.SetMinimum(0.)
+    mg.SetMaximum(0.5)
+    legend = TLegend(0.15,0.88-0.08*4,0.3,0.88,'','NDC')
+    legend.AddEntry(roc_b, "b-jets (GNN)","lp")
+    legend.AddEntry(roc_c, "c-jets (GNN)","lp")
+    legend.AddEntry(comp_roc_b, "b-jets (SV1)","p")
+    legend.AddEntry(comp_roc_c, "c-jets (SV1)","p")
+    legend.SetTextSize(0.025)
+    legend.SetFillStyle(0)
+    legend.SetBorderSize(0)
+    legend.Draw("SAME")
     canv.SaveAs(filename)
     canv.Clear()
     del canv

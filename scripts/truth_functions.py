@@ -24,13 +24,14 @@ class truth_particle():
 
 
 class truth_track():
-    def __init__(self, barcode, pdgid, vertex, pt, eta, phi, z0):
+    def __init__(self, barcode, pdgid, vertex, pt, eta, phi, d0, z0):
         self.barcode = barcode
         self.pdgid = pdgid
         self.vertex = vertex
         self.pt = pt
         self.eta = eta
         self.phi = phi
+        self.d0 = d0
         self.z0 = z0
         self.hf_ancestor = 0 #direct HF ancestor
         self.btoc_ancestor = 0 #bH ancestor for bH->cH tracks from charm hadrons
@@ -39,8 +40,8 @@ class truth_track():
 
     def print_track(self,level):
         prefix = "xx"*level + ">"
-        print("{} PDG ID: {}, Barcode: {}, Vertex: {}".format(prefix, self.pdgid, self.barcode, self.vertex))
-
+        if self.classification: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}, Class: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0, self.classification))
+        else: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0)) 
 
 def build_particle_dict(entry):
     particle_dict = {}
@@ -93,9 +94,10 @@ def build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta
             trk_phi = entry.jet_trk_phi[i][j]
             trk_pdgId = entry.jet_trk_pdg_id[i][j]
             trk_barcode = entry.jet_trk_barcode[i][j]
+            trk_d0 = entry.jet_trk_d0[i][j]
             trk_z0 = entry.jet_trk_z0[i][j]
 
-            track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_z0)
+            track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
 
         else:
             jet_cut_trk += 1

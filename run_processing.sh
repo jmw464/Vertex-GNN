@@ -2,7 +2,9 @@
 
 NTUPLES="user.jmwagner.26222492.Akt4EMPf_BTagging201903._000007 user.jmwagner.25874500.Akt4EMPf_BTagging201903._000005"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh07_tt05_cut_v5
+DATANAME=btag_zh07_tt05_cut_v5_pv
+
+ENVNAME=dgl-env #name of conda environment that contains packages
 
 ENTRIES=( 150000 150000 ) #jets used per file (after cuts)
 
@@ -23,7 +25,7 @@ then
 	exit 1
 fi
 
-source activate dgl-env
+source activate $ENVNAME
 
 printf "##########BEGINNING PROCESSING##########\n\n"
 
@@ -31,22 +33,22 @@ file_counter=0
 for NTUPLE in $NTUPLES
 do
 	printf "Running process_ntuple.py to create ${DATANAME}_${NTUPLE}.hdf5 with ${ENTRIES[$file_counter]} jets\n"
-	#python scripts/process_ntuple.py -n ${DATADIR}${NTUPLE}.root -e ${ENTRIES[$file_counter]} -d ${DATADIR}${DATANAME}/ -s ${DATANAME}_${NTUPLE}
+	python scripts/process_ntuple.py -n ${DATADIR}${NTUPLE}.root -e ${ENTRIES[$file_counter]} -d ${DATADIR}${DATANAME}/ -s ${DATANAME}_${NTUPLE}
 	printf "\n"
 	file_counter=$(expr $file_counter + 1)
 
 	printf "Running create_graphs.py to transform ${DATANAME}_${NTUPLE}.hdf5 into GNN compatible data\n"
-	#python scripts/create_graphs.py -d ${DATADIR}${DATANAME}/ -s ${DATANAME}_${NTUPLE}
+	python scripts/create_graphs.py -d ${DATADIR}${DATANAME}/ -s ${DATANAME}_${NTUPLE}
 	printf "\n"
 done
 
 printf "Running combine_graphs.py to combine individual files\n"
-#python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES"
+python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES"
 	
 if [[ $NORMED != 0 ]]
 then
 	printf "Running norm_graphs.py to normalize graphs based on training dataset\n"
-	#python scripts/norm_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME
+	python scripts/norm_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME
 	printf "\n"
 fi
 

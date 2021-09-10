@@ -80,13 +80,14 @@ def main(argv):
         pv_z = infile['efeatures']['event_vx'][event_index]
         nedges = ntracks*(ntracks-1)
 
-        jet_flavor = 0
-        nbhad = infile['info']['nbhad'][ientry]
-        nchad = infile['info']['nchad'][ientry]
-        if nbhad > 0:
-            jet_flavor = 1
-        elif nchad > 0:
+        jet_flavor = infile['info']['jet_flavor'][ientry]
+        #make flavor label definitions consistent
+        if jet_flavor == 4: #c-jet
             jet_flavor = 2
+        elif jet_flavor == 5: #b-jet
+            jet_flavor = 1
+        elif jet_flavor == 15: #tau-jets
+            jet_flavor = 0
 
         #initialize empty arrays
         node_features_base = np.zeros((ntracks,nnfeatures_base))

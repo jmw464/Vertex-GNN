@@ -1,14 +1,16 @@
 #!/bin/bash
 
-RUN=27
+RUN=25 #run number - used to distinguish output
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATA=test_sample #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
+DATANAME=btag_zh07_tt05_cut_v5 #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
 
-EPOCHS=10
+ENVNAME=dgl-env #name of conda environment that contains packages
+
+EPOCHS=50
 
 NORMED=1
-MULTICLASS=1
+MULTICLASS=0
 
 #create output directory if not already there
 if [ ! -d ${OUTPUTDIR}${RUN}/ ]
@@ -16,15 +18,15 @@ then
 	mkdir ${OUTPUTDIR}${RUN}/
 fi
 
-source activate dgl-env
+source activate $ENVNAME
 
 printf "##########BEGINNING TRAINING##########\n"
-python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATA -d ${DATADIR}${DATA}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS
+#python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS
 
 printf "##########PLOTTING RESULTS##########\n"
-python scripts/plot_results.py -r $RUN -s $DATA -d ${DATADIR}${DATA}/ -o $OUTPUTDIR
+#python scripts/plot_results.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR
 
 if [[ $MULTICLASS == 0 ]]
 then
-	python scripts/compare_performance.py -r $RUN -s $DATA -d ${DATADIR}${DATA}/ -o $OUTPUTDIR -n $NORMED
+	python scripts/compare_performance.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED
 fi

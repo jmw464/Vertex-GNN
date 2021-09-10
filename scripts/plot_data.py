@@ -1,7 +1,7 @@
 import dgl
 import torch as th
 import os,sys,math,glob,ROOT
-from ROOT import TH1D, TCanvas, gROOT
+from ROOT import TH1D, TCanvas, gROOT, TProfile
 import numpy as np
 import argparse
 
@@ -72,13 +72,13 @@ def main(argv):
     hist_trk_phi_btoc = TH1D("trk_phi_btoc", "Track #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     hist_trk_phi_c = TH1D("trk_phi_c", "Track #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     
-    hist_trk_d0_b = TH1D("trk_d0_b", "Track d0 in dataset;d0 [cm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
-    hist_trk_d0_btoc = TH1D("trk_d0_btoc", "Track d0 in dataset;d0 [cm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
-    hist_trk_d0_c = TH1D("trk_d0_c", "Track d0 in dataset;d0 [cm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
+    hist_trk_d0_b = TH1D("trk_d0_b", "Track d0 in dataset;d0 [mm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
+    hist_trk_d0_btoc = TH1D("trk_d0_btoc", "Track d0 in dataset;d0 [mm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
+    hist_trk_d0_c = TH1D("trk_d0_c", "Track d0 in dataset;d0 [mm];Normalized entries", 20, track_d0_bound[0], track_d0_bound[1])
     
-    hist_trk_z0_b = TH1D("trk_z0_b", "Track z0 in dataset;z0 [cm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
-    hist_trk_z0_btoc = TH1D("trk_z0_btoc", "Track z0 in dataset;z0 [cm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
-    hist_trk_z0_c = TH1D("trk_z0_c", "Track z0 in dataset;z0 [cm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_trk_z0_b = TH1D("trk_z0_b", "Track z0 in dataset;z0 [mm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_trk_z0_btoc = TH1D("trk_z0_btoc", "Track z0 in dataset;z0 [mm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_trk_z0_c = TH1D("trk_z0_c", "Track z0 in dataset;z0 [mm];Normalized entries", 20, track_z0_bound[0], track_z0_bound[1])
     
     hist_jet_pt_b = TH1D("jet_pt_b", "Jet pT in dataset;pT [GeV];Normalized entries", 20, jet_pt_bound[0], jet_pt_bound[1])
     hist_jet_pt_c = TH1D("jet_pt_c", "Jet pT in dataset;pT [GeV];Normalized entries", 20, jet_pt_bound[0], jet_pt_bound[1])
@@ -92,8 +92,11 @@ def main(argv):
     hist_jet_phi_c = TH1D("jet_phi_c", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     hist_jet_phi_l = TH1D("jet_phi_l", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
 
-    hist_vertex_lxy_b = TH1D("vertex_lxy_b", "Vertex Lxy in dataset;Lxy [cm];Normalized entries", 20, 0, 200)
-    hist_vertex_lxy_c = TH1D("vertex_lxy_c", "Vertex Lxy in dataset;Lxy [cm];Normalized entries", 20, 0, 200)
+    prof_frac_reco_eta_b = TProfile("frac_reco_eta_b", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,jet_eta_bound[0],jet_eta_bound[1])
+    prof_frac_reco_eta_c = TProfile("frac_reco_eta_c", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,jet_eta_bound[0],jet_eta_bound[1])
+
+    hist_vertex_lxy_b = TH1D("vertex_lxy_b", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 200)
+    hist_vertex_lxy_c = TH1D("vertex_lxy_c", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 200)
 
     bin_edges = np.linspace(-0.5,10.5,12)
     hist_no_trk_b = TH1D("no_trk_b", "Number of tracks per jet in dataset;Number of tracks;Normalized entries", 11, bin_edges)
@@ -113,13 +116,13 @@ def main(argv):
         hist_trk_phi_err_btoc = TH1D("trk_phi_err_btoc", "Track #phi error in dataset;#phi error;Normalized entries", 20, 0, 0.01)
         hist_trk_phi_err_c = TH1D("trk_phi_err_c", "Track #phi error in dataset;#phi error;Normalized entries", 20, 0, 0.01)
         
-        hist_trk_d0_err_b = TH1D("trk_d0_err_b", "Track d0 error in dataset;d0 error [cm];Normalized entries", 20, 0, 5)
-        hist_trk_d0_err_btoc = TH1D("trk_d0_err_btoc", "Track d0 error in dataset;d0 error [cm];Normalized entries", 20, 0, 5)
-        hist_trk_d0_err_c = TH1D("trk_d0_err_c", "Track d0 error in dataset;d0 error [cm];Normalized entries", 20, 0, 5)
+        hist_trk_d0_err_b = TH1D("trk_d0_err_b", "Track d0 error in dataset;d0 error [mm];Normalized entries", 20, 0, 5)
+        hist_trk_d0_err_btoc = TH1D("trk_d0_err_btoc", "Track d0 error in dataset;d0 error [mm];Normalized entries", 20, 0, 5)
+        hist_trk_d0_err_c = TH1D("trk_d0_err_c", "Track d0 error in dataset;d0 error [mm];Normalized entries", 20, 0, 5)
         
-        hist_trk_z0_err_b = TH1D("trk_z0_err_b", "Track z0 error in dataset;z0 error [cm];Normalized entries", 20, 0, 5)
-        hist_trk_z0_err_btoc = TH1D("trk_z0_err_btoc", "Track z0 error in dataset;z0 error [cm];Normalized entries", 20, 0, 5)
-        hist_trk_z0_err_c = TH1D("trk_z0_err_c", "Track z0 error in dataset;z0 error [cm];Normalized entries", 20, 0, 5)
+        hist_trk_z0_err_b = TH1D("trk_z0_err_b", "Track z0 error in dataset;z0 error [mm];Normalized entries", 20, 0, 5)
+        hist_trk_z0_err_btoc = TH1D("trk_z0_err_btoc", "Track z0 error in dataset;z0 error [mm];Normalized entries", 20, 0, 5)
+        hist_trk_z0_err_c = TH1D("trk_z0_err_c", "Track z0 error in dataset;z0 error [mm];Normalized entries", 20, 0, 5)
 
     #read in normalization constants for features
     if os.path.isfile(normfile_name):
@@ -137,13 +140,15 @@ def main(argv):
 
     #fill histograms using testing, training and validation files
     filename_array = [train_file_name, val_file_name, test_file_name]
+    jet_classification = np.zeros((3,3))
     for filename in filename_array:
         graphs = dgl.load_graphs(filename)[0]
         for graph in graphs:
             features_base = graph.ndata['features_base'].numpy()
             if incl_errors: features_errors = graph.ndata['features_errors'].numpy()
             track_flavors = graph.ndata['node_info'].numpy()[:,2]
-            jet_flavor = graph.ndata['graph_info'].numpy()[0,0]
+            jet_flavor = int(graph.ndata['graph_info'].numpy()[0,0])
+            reco_jet_flavor = 0
             jet_pv = [graph.ndata['graph_info'].numpy()[0,1], graph.ndata['graph_info'].numpy()[0,2], graph.ndata['graph_info'].numpy()[0,3]]
             used_sv = [] #array containing secondary vertices that were already considered for relevant plots
             for i in range(len(features_base[:,0])):
@@ -163,7 +168,8 @@ def main(argv):
                         hist_trk_phi_err_b.Fill(features_errors[i,2])
                         hist_trk_d0_err_b.Fill(features_errors[i,3])
                         hist_trk_z0_err_b.Fill(features_errors[i,4])
-                elif track_flavors[i] == 2:
+                    reco_jet_flavor = 1
+                elif track_flavors[i] == 3:
                     hist_trk_pt_btoc.Fill(features_base[i,0])
                     hist_trk_theta_btoc.Fill(features_base[i,1])
                     hist_trk_phi_btoc.Fill(features_base[i,2])
@@ -178,7 +184,8 @@ def main(argv):
                         hist_trk_phi_err_btoc.Fill(features_errors[i,2])
                         hist_trk_d0_err_btoc.Fill(features_errors[i,3])
                         hist_trk_z0_err_btoc.Fill(features_errors[i,4])
-                elif track_flavors[i] == 3:
+                    reco_jet_flavor = 1
+                elif track_flavors[i] == 2:
                     hist_trk_pt_c.Fill(features_base[i,0])
                     hist_trk_theta_c.Fill(features_base[i,1])
                     hist_trk_phi_c.Fill(features_base[i,2])
@@ -193,22 +200,31 @@ def main(argv):
                         hist_trk_phi_err_c.Fill(features_errors[i,2])
                         hist_trk_d0_err_c.Fill(features_errors[i,3])
                         hist_trk_z0_err_c.Fill(features_errors[i,4])
+                    if not reco_jet_flavor: reco_jet_flavor = 2
+            jet_classification[jet_flavor,reco_jet_flavor] += 1
             if jet_flavor == 1:
                 hist_jet_pt_b.Fill(features_base[0,5])
                 hist_jet_eta_b.Fill(features_base[0,6])
                 hist_jet_phi_b.Fill(features_base[0,7])
                 hist_no_trk_b.Fill(graph.num_nodes())
+                if reco_jet_flavor == 1: reco_jet_flavor = 1
+                elif reco_jet_flavor == 2: reco_jet_flavor = 0
+                prof_frac_reco_eta_b.Fill(features_base[0,6], reco_jet_flavor)
             elif jet_flavor == 2:
                 hist_jet_pt_c.Fill(features_base[0,5])
                 hist_jet_eta_c.Fill(features_base[0,6])
                 hist_jet_phi_c.Fill(features_base[0,7])
                 hist_no_trk_c.Fill(graph.num_nodes())
+                if reco_jet_flavor == 1: reco_jet_flavor = 0
+                elif reco_jet_flavor == 2: reco_jet_flavor = 1
+                prof_frac_reco_eta_c.Fill(features_base[0,6], reco_jet_flavor)
             else:
                 hist_jet_pt_l.Fill(features_base[0,5])
                 hist_jet_eta_l.Fill(features_base[0,6])
                 hist_jet_phi_l.Fill(features_base[0,7])
                 hist_no_trk_l.Fill(graph.num_nodes())
 
+    plot_confusion_matrix(jet_classification, ["l","b","c"], ["l","b","c"], "", ["Target jet classification", "Jet flavor label"], data_path+data_name+"_jet_cm.png")
     plot_hist([hist_trk_pt_b, hist_trk_pt_btoc, hist_trk_pt_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_pt.png", "HIST", scaling=[mean_features[0],std_features[0]])
     plot_hist([hist_trk_theta_b, hist_trk_theta_btoc, hist_trk_theta_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_theta.png", "HIST", scaling=[mean_features[1],std_features[1]])
     plot_hist([hist_trk_phi_b, hist_trk_phi_btoc, hist_trk_phi_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_phi.png", "HIST", scaling=[mean_features[2],std_features[2]])
@@ -219,7 +235,8 @@ def main(argv):
     plot_hist([hist_jet_phi_b, hist_jet_phi_c, hist_jet_phi_l], ["b", "c", "l"], True, False, True, data_path+data_name+"_jet_phi.png", "HIST", scaling=[mean_features[7],std_features[7]])
     plot_hist([hist_no_trk_b, hist_no_trk_c, hist_no_trk_l], ["b", "c", "l"], True, False, True, data_path+data_name+"_no_trk.png", "HIST")
     plot_hist([hist_vertex_lxy_b, hist_vertex_lxy_c], ["b", "c"], True, True, True, data_path+data_name+"_lxy.png", "HIST")
-    
+    plot_profile([prof_frac_reco_eta_b, prof_frac_reco_eta_c], ["b", "c"], [0.0, 1.4], False, data_path+data_name+"_frac_reco_eta.png")
+
     if incl_errors:
         plot_hist([hist_trk_p_err_b, hist_trk_p_err_btoc, hist_trk_p_err_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_p_err.png", "HIST", scaling=[mean_features[8],std_features[8]])
         plot_hist([hist_trk_theta_err_b, hist_trk_theta_err_btoc, hist_trk_theta_err_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_theta_err.png", "HIST", scaling=[mean_features[9],std_features[9]])
