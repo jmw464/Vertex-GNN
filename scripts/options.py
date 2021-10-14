@@ -22,7 +22,8 @@ jet_eta_cut = 2.5 #maximum allowed |jet eta| value (default <2.5)
 track_pt_cut = 650 #minimum required track pT value
 track_eta_cut = 2.5 #maximum allowed |track eta| value (default: <2.5)
 track_z0_cut = 20 #maximum allowed |track z0| value
-remove_pv = False #toggle to remove all tracks that are already associated with primary vertices
+remove_pv = True #toggle to remove all tracks that are already associated with the primary vertex
+remove_pileup = True #toggle to remove all tracks taht are already associated with pileup vertices
 
 #input data parameters - PROCESSING, GNN
 incl_errors = True #include diagonal covariance matrix GNN features

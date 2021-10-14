@@ -21,12 +21,12 @@ fi
 source activate $ENVNAME
 
 printf "##########BEGINNING TRAINING##########\n"
-#python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS
+python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS | tee ${OUTPUTDIR}${RUN}/${DATANAME}_results.txt
 
 printf "##########PLOTTING RESULTS##########\n"
-#python scripts/plot_results.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR
+python scripts/plot_results.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR
 
 if [[ $MULTICLASS == 0 ]]
 then
-	python scripts/compare_performance.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED
+	python scripts/compare_performance.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED | tee ${OUTPUTDIR}${RUN}/${DATANAME}_comparisons.txt
 fi

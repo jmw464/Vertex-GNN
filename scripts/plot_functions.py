@@ -166,6 +166,44 @@ def plot_profile(profile_list, labels, ylimit, overflow, filename):
     del canv
 
 
+def plot_bar(histlist, axislabels, labels, filename, options):
+    canv = TCanvas("c1", "c1", 800, 600)
+    canv.SetTopMargin(10)
+    canv.SetRightMargin(100)
+    histstack = THStack("stack",histlist[0].GetTitle())
+    legend = TLegend(0.76,0.88-0.08*len(histlist),0.91,0.88,'','NDC')
+    colorlist = [4,8,2,6,1]
+
+    if options: options += " NOSTACK"
+    else: options = "NOSTACK"
+
+    maximum = 0
+    for i in range(len(histlist)):
+        histlist[i].SetLineColorAlpha(colorlist[i],0.65)
+        histlist[i].SetLineWidth(3)
+
+        if histlist[i].GetMaximum() > maximum: maximum = histlist[i].GetMaximum()
+        legend.AddEntry(histlist[i], labels[i], "l")
+        histstack.Add(histlist[i])
+
+    histstack.SetMaximum(maximum*1.4)
+    histstack.Draw(options)
+    histstack.GetXaxis().SetTitle(histlist[0].GetXaxis().GetTitle())
+    histstack.GetYaxis().SetTitle(histlist[0].GetYaxis().GetTitle())
+    histstack.GetXaxis().SetNdivisions(len(axislabels))
+    histstack.GetXaxis().CenterLabels(True)
+    for i, label in enumerate(axislabels):
+        histstack.GetXaxis().ChangeLabel(i+1,-1,-1,-1,-1,-1,str(label))
+
+    legend.SetTextSize(0.02)
+    legend.SetFillStyle(0)
+    legend.SetBorderSize(0)
+    legend.Draw("SAME")
+    canv.SaveAs(filename)
+    canv.Clear()
+    del canv
+
+
 def plot_confusion_matrix(conf_matrix, xlabels, ylabels, title, axis_labels, filename):
     fig, ax = plt.subplots(figsize=(7.5, 7.5))
     xlab = [""]
@@ -185,7 +223,7 @@ def plot_confusion_matrix(conf_matrix, xlabels, ylabels, title, axis_labels, fil
     plt.savefig(filename)
 
 
-def plot_roc_curve(roc_b, roc_c, comp_roc_b, comp_roc_c, type, filename):
+def plot_roc_curve(roc_b, roc_c, comp_roc_b, comp_roc_c, xlimits, ylimits, type, filename):
     canv = TCanvas("c1", "c1", 800, 600)
     mg = TMultiGraph()
     roc_b.SetLineColor(1)
@@ -206,9 +244,9 @@ def plot_roc_curve(roc_b, roc_c, comp_roc_b, comp_roc_c, type, filename):
     mg.Add(comp_roc_c)
     mg.SetTitle("; "+ type +" efficiency; " + type + " fake rate")
     mg.Draw("ALP")
-    mg.GetXaxis().SetLimits(0.5,1.)
-    mg.SetMinimum(0.)
-    mg.SetMaximum(0.5)
+    mg.GetXaxis().SetLimits(xlimits[0],xlimits[1])
+    mg.SetMinimum(ylimits[0])
+    mg.SetMaximum(ylimits[1])
     legend = TLegend(0.15,0.88-0.08*4,0.3,0.88,'','NDC')
     legend.AddEntry(roc_b, "b-jets (GNN)","lp")
     legend.AddEntry(roc_c, "c-jets (GNN)","lp")

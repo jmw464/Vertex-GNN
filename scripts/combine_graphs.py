@@ -36,7 +36,7 @@ def main(argv):
     total_true = total_edges = total_b = total_c = total_btoc = total_o = 0
 
     for ntuple in ntuples:
-        infile_name = data_path+data_name+"_"+ntuple+".bin"
+        infile_name = data_path+ntuple+".bin"
         graphs = dgl.load_graphs(infile_name)[0]
         ngraphs += len(graphs)
 

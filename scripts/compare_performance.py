@@ -146,10 +146,10 @@ def main(argv):
     gnn_pt_profile_phys_eff_b = TProfile("gnn_pt_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_phys_eff_b = TProfile("sv1_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_phys_eff_b = TProfile("gnn_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    sv1_ntrk_profile_phys_eff_c = TProfile("sv1_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_phys_eff_c = TProfile("gnn_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    sv1_ntrk_profile_phys_eff_b = TProfile("sv1_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_phys_eff_b = TProfile("gnn_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_ntrk_profile_phys_eff_c = TProfile("sv1_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
+    gnn_ntrk_profile_phys_eff_c = TProfile("gnn_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
+    sv1_ntrk_profile_phys_eff_b = TProfile("sv1_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
+    gnn_ntrk_profile_phys_eff_b = TProfile("gnn_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
 
     sv1_pt_profile_alg_fr = TProfile("sv1_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
     gnn_pt_profile_alg_fr = TProfile("gnn_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
@@ -457,13 +457,13 @@ def main(argv):
         alg_roc_curve_c = TGraph(len(c_alg_efficiency), c_alg_efficiency, alg_fake_rate)
         sv1_alg_eff_b = TGraph(len(sv1_b_alg_efficiency), sv1_b_alg_efficiency, sv1_alg_fake_rate)
         sv1_alg_eff_c = TGraph(len(sv1_c_alg_efficiency), sv1_c_alg_efficiency, sv1_alg_fake_rate)
-        plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, "algorithmic", outfile_name+"_a_roc.png")
+        plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, [0.5,1.], [0.,0.5], "algorithmic", outfile_name+"_alg_roc.png")
 
         phys_roc_curve_b = TGraph(len(b_phys_efficiency), b_phys_efficiency, phys_fake_rate)
         phys_roc_curve_c = TGraph(len(c_phys_efficiency), c_phys_efficiency, phys_fake_rate)
         sv1_phys_eff_b = TGraph(len(sv1_b_phys_efficiency), sv1_b_phys_efficiency, sv1_phys_fake_rate)
         sv1_phys_eff_c = TGraph(len(sv1_c_phys_efficiency), sv1_c_phys_efficiency, sv1_phys_fake_rate)
-        plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, "physics", outfile_name+"_p_roc.png")
+        plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, [0.0,1.], [0.,0.3], "physics", outfile_name+"_phys_roc.png")
 
     canv1 = TCanvas("c1", "c1", 800, 600)
 

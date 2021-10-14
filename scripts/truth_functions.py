@@ -6,6 +6,10 @@ import argparse
 from ROOT import TFile, TH1D, TH1I, gROOT, TCanvas, gPad, TLegend
 import time
 
+wd_cm = [411, 421, 431] #weakly decaying charm mesons
+wd_cb = [4122, 4132, 4212, 4232, 4332] #weakly decaying charm baryons
+wd_bm = [511, 521, 531, 541] #weakly decaying bottom mesons
+wd_bb = [5112, 5122, 5132, 5212, 5222, 5232, 5332] #weakly decaying bottom baryons
 
 class truth_particle():
     def __init__(self, barcode, pdgid, pv, dv, charged, p, parents, children):
@@ -80,62 +84,58 @@ def build_particle_dict(entry):
     return particle_dict
 
 
-def build_track_dict(entry, i, particle_dict, remove_pv, track_pt_cut, track_eta_cut, track_z0_cut):
-    track_dict = {}
+def build_track_dict(entry, i, particle_dict, remove_pv, remove_pileup, track_pt_cut, track_eta_cut, track_z0_cut):
+    acc_track_dict = {}
+    rej_track_dict = {}
     nTrack =  entry.jet_trk_pt[i].size()
-    jet_cut_trk = 0
 
     for j in range(nTrack):
         trk_vertex = np.array([entry.jet_trk_vtx_X[i][j], entry.jet_trk_vtx_Y[i][j], entry.jet_trk_vtx_Z[i][j]])
+        trk_pt = entry.jet_trk_pt[i][j]
+        trk_eta = entry.jet_trk_eta[i][j]
+        trk_phi = entry.jet_trk_phi[i][j]
+        trk_pdgId = entry.jet_trk_pdg_id[i][j]
+        trk_barcode = entry.jet_trk_barcode[i][j]
+        trk_d0 = entry.jet_trk_d0[i][j]
+        trk_z0 = entry.jet_trk_z0[i][j]
 
-        if check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut) and (not remove_pv or not entry.jet_trk_isPV_reco[i][j]):
-            trk_pt = entry.jet_trk_pt[i][j]
-            trk_eta = entry.jet_trk_eta[i][j]
-            trk_phi = entry.jet_trk_phi[i][j]
-            trk_pdgId = entry.jet_trk_pdg_id[i][j]
-            trk_barcode = entry.jet_trk_barcode[i][j]
-            trk_d0 = entry.jet_trk_d0[i][j]
-            trk_z0 = entry.jet_trk_z0[i][j]
-
-            track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
-
+        pv_condition = (remove_pv and entry.jet_trk_isPV_reco[i][j] == 1) or (remove_pileup and entry.jet_trk_isPV_reco[i][j] == 2)
+        if check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut) and not pv_condition:
+            acc_track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
         else:
-            jet_cut_trk += 1
+            rej_track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
 
-    for ti in track_dict:
-        track = track_dict[ti]
+    for t_dict in [acc_track_dict, rej_track_dict]:
+        for ti in t_dict:
+            track = t_dict[ti]
 
-        #don't process tracks that don't have associated truth particles
-        if track.pdgid == -999:
-            continue
+            #don't process tracks that don't have associated truth particles
+            if track.pdgid == -999:
+                continue
 
-        #get direct HF ancestors of track particle
-        t_barcode = track.barcode
-        track_particle = particle_dict[t_barcode]
-        ancestors = np.array([])
-        ancestors = get_hf_relatives(track_particle, particle_dict, ancestors, 'a', 0)
-        ancestors = np.unique(ancestors) #only keep unique barcodes
+            #get direct HF ancestors of track particle
+            t_barcode = track.barcode
+            track_particle = particle_dict[t_barcode]
+            ancestors = np.array([])
+            ancestors = get_hf_relatives(track_particle, particle_dict, ancestors, 'a', 0)
+            ancestors = np.unique(ancestors) #only keep unique barcodes
 
-        #check which ancestor will be marked as primary (by checking distance between HF DV and track PV)
-        min_distance = -1
-        direct_ancestor = 0
-        for ancestor in ancestors:
-            distance = np.linalg.norm(track_particle.pv - particle_dict[ancestor].dv)
-            if min_distance == -1 or distance < min_distance:
-                min_distance = distance
-                direct_ancestor = ancestor
-        track.hf_ancestor = direct_ancestor
-        if ancestors.size: track.ancestor_vertex = particle_dict[direct_ancestor].dv
-        track_dict[ti] = track
+            #check which ancestor will be marked as primary (by checking distance between HF DV and track PV)
+            min_distance = -1
+            direct_ancestor = 0
+            for ancestor in ancestors:
+                distance = np.linalg.norm(track_particle.pv - particle_dict[ancestor].dv)
+                if min_distance == -1 or distance < min_distance:
+                    min_distance = distance
+                    direct_ancestor = ancestor
+            track.hf_ancestor = direct_ancestor
+            if ancestors.size: track.ancestor_vertex = particle_dict[direct_ancestor].dv
+            t_dict[ti] = track
 
-    return track_dict, jet_cut_trk
+    return acc_track_dict, rej_track_dict
 
 
 def id_particle(pdgid):
-    wd_cm = [411, 421, 431] #weakly decaying charm mesons
-    wd_cb = [4122, 4132, 4232, 4212, 4332] #weakly decaying charm baryons
-    wd_bm = [511, 521, 531, 541] #weakly decaying bottom mesons
-    wd_bb = [5122, 5132, 5232, 5112, 5212, 5222, 5332] #weakly decaying bottom baryons
 
     if abs(pdgid) in wd_cm or abs(pdgid) in wd_cb:
         return 'ch'
