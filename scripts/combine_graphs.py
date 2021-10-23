@@ -33,7 +33,7 @@ def main(argv):
 
     g_list = []
     ngraphs = 0
-    total_true = total_edges = total_b = total_c = total_btoc = total_o = 0
+    total_cut = total_remain = 0
 
     for ntuple in ntuples:
         infile_name = data_path+ntuple+".bin"
@@ -43,25 +43,19 @@ def main(argv):
         #add file number to graphs
         for graph in graphs:
             ntracks = graph.num_nodes()
-            total_true += int(th.sum(graph.edata['bin_labels'][:,0]))
-            total_b += int(th.sum(graph.edata['mult_labels'][:,0] == 1))
-            total_c += int(th.sum(graph.edata['mult_labels'][:,0] == 2))
-            total_edges += list(graph.edata['bin_labels'][:,0].size())[0]
+            total_cut += int(th.sum(graph.ndata['passed_cuts'] == 0))
+            total_remain += int(th.sum(graph.ndata['passed_cuts'] == 1))
         
             g_list.append(graph)
 
     random.shuffle(g_list)
 
-    #calculate number of features in graphs
-    nnfeatures = g_list[0].ndata['features_base'].size()[1]
-    if 'features_errors' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_errors'].size()[1]
-    if 'features_hits' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_hits'].size()[1]
-    if 'features_corr' in g_list[0].ndata.keys(): nnfeatures += g_list[0].ndata['features_corr'].size()[1]
-
     #calculate size of testing, training and validation set
     test_len = int(round(testp*ngraphs))
     val_len = int(round(valp*ngraphs))
     train_len = int(ngraphs - (test_len + val_len))
+
+    print("Cut {}% of {} tracks".format(100*total_cut/(total_cut+total_remain), total_cut+total_remain))
 
     #split g_list
     test_list = g_list[:test_len]
@@ -72,17 +66,6 @@ def main(argv):
     dgl.save_graphs(test_outfile_name, test_list)
     dgl.save_graphs(val_outfile_name, val_list)
     dgl.save_graphs(train_outfile_name, train_list)
-
-    #store important values in paramfile
-    paramfile = open(paramfile_name, "w")
-    paramfile.write(str(test_len)+'\n')
-    paramfile.write(str(val_len)+'\n')
-    paramfile.write(str(train_len)+'\n')
-    paramfile.write(str(total_true/total_edges)+'\n')
-    paramfile.write(str(total_b/total_edges)+'\n')
-    paramfile.write(str(total_c/total_edges)+'\n')
-    paramfile.close()
-
 
 if __name__ == '__main__':
     main(sys.argv)

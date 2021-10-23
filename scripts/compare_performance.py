@@ -211,7 +211,7 @@ def main(argv):
                 true_vertex = true_vertices[i]
                 edge_id = g.edge_id(true_vertex[0],true_vertex[1])
 
-                sv_coord = np.array([g.ndata['node_info'][true_vertex[0],3], g.ndata['node_info'][true_vertex[0],4], g.ndata['node_info'][true_vertex[0],5]])
+                sv_coord = np.array([g.ndata['node_info'][true_vertex[0],5], g.ndata['node_info'][true_vertex[0],6], g.ndata['node_info'][true_vertex[0],7]])
                 Lxy = np.linalg.norm(pv_coord-sv_coord)
                 vertex_flavor = g.edata['mult_labels'][edge_id]
                 if vertex_flavor == 1:

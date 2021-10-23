@@ -47,6 +47,7 @@ class truth_track():
         if self.classification: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}, Class: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0, self.classification))
         else: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0)) 
 
+
 def build_particle_dict(entry):
     particle_dict = {}
     nTruth = entry.truth_pdgId.size()
@@ -84,9 +85,8 @@ def build_particle_dict(entry):
     return particle_dict
 
 
-def build_track_dict(entry, i, particle_dict, remove_pv, remove_pileup, track_pt_cut, track_eta_cut, track_z0_cut):
-    acc_track_dict = {}
-    rej_track_dict = {}
+def build_track_dict(entry, i, particle_dict):
+    track_dict = {}
     nTrack =  entry.jet_trk_pt[i].size()
 
     for j in range(nTrack):
@@ -99,40 +99,35 @@ def build_track_dict(entry, i, particle_dict, remove_pv, remove_pileup, track_pt
         trk_d0 = entry.jet_trk_d0[i][j]
         trk_z0 = entry.jet_trk_z0[i][j]
 
-        pv_condition = (remove_pv and entry.jet_trk_isPV_reco[i][j] == 1) or (remove_pileup and entry.jet_trk_isPV_reco[i][j] == 2)
-        if check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut) and not pv_condition:
-            acc_track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
-        else:
-            rej_track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
+        track_dict[j] = truth_track(trk_barcode, trk_pdgId, trk_vertex, trk_pt, trk_eta, trk_phi, trk_d0, trk_z0)
 
-    for t_dict in [acc_track_dict, rej_track_dict]:
-        for ti in t_dict:
-            track = t_dict[ti]
+    for ti in track_dict:
+        track = track_dict[ti]
 
-            #don't process tracks that don't have associated truth particles
-            if track.pdgid == -999:
-                continue
+        #don't process tracks that don't have associated truth particles
+        if track.pdgid == -999:
+            continue
 
-            #get direct HF ancestors of track particle
-            t_barcode = track.barcode
-            track_particle = particle_dict[t_barcode]
-            ancestors = np.array([])
-            ancestors = get_hf_relatives(track_particle, particle_dict, ancestors, 'a', 0)
-            ancestors = np.unique(ancestors) #only keep unique barcodes
+        #get direct HF ancestors of track particle
+        t_barcode = track.barcode
+        track_particle = particle_dict[t_barcode]
+        ancestors = np.array([])
+        ancestors = get_hf_relatives(track_particle, particle_dict, ancestors, 'a', 0)
+        ancestors = np.unique(ancestors) #only keep unique barcodes
 
-            #check which ancestor will be marked as primary (by checking distance between HF DV and track PV)
-            min_distance = -1
-            direct_ancestor = 0
-            for ancestor in ancestors:
-                distance = np.linalg.norm(track_particle.pv - particle_dict[ancestor].dv)
-                if min_distance == -1 or distance < min_distance:
-                    min_distance = distance
-                    direct_ancestor = ancestor
-            track.hf_ancestor = direct_ancestor
-            if ancestors.size: track.ancestor_vertex = particle_dict[direct_ancestor].dv
-            t_dict[ti] = track
+        #check which ancestor will be marked as primary (by checking distance between HF DV and track PV)
+        min_distance = -1
+        direct_ancestor = 0
+        for ancestor in ancestors:
+            distance = np.linalg.norm(track_particle.pv - particle_dict[ancestor].dv)
+            if min_distance == -1 or distance < min_distance:
+                min_distance = distance
+                direct_ancestor = ancestor
+        track.hf_ancestor = direct_ancestor
+        if ancestors.size: track.ancestor_vertex = particle_dict[direct_ancestor].dv
+        track_dict[ti] = track
 
-    return acc_track_dict, rej_track_dict
+    return track_dict
 
 
 def id_particle(pdgid):

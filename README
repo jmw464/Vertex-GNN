@@ -57,7 +57,8 @@ o) process_ntuple.py: Processes a single ROOT ntuple, extracts information
    relevant to the GNN and saves this information in the form of HDF5 files.
    Track information is saved directly while truth particle information is
    used within the script to derive relevant information (such as track
-   labels). Also makes cuts on data.
+   labels). Also performs cuts on data (cut jets are removed entirely,
+   cut tracks are marked but kept for plotting purposes)..
 o) create_graphs.py: Takes a single HDF5 file created with process_ntuple.py
    and turns it into DGL compatible graph file that can be used for training
    directly. Also saves text file containing some values derived from the data
@@ -71,6 +72,11 @@ o) norm_graphs.py: This script is OPTIONAL. It performs normalization of all
    subtracting the mean of each feature and dividing by its standard deviation,
    which are calculated from the training data only. Some features are
    normalized slightly differently (details are in the script).
+o) prune_graphs.py: Final script to be run before GNN training. Fully removes
+   all tracks marked as cut from graphs in training, testing and validation
+   files and writes a text file containing some parameters of the training
+   data relevant for GNN training (such as the proportion of true to false
+   edges).
 o) truth_functions.py: Contains functions that help with processing truth
    information (such as generating dictionaries of truth particles/tracks).
    Used extensively in process_ntuple.py.
@@ -94,7 +100,8 @@ o) GNN_eval.py: Contains functions used to evaluate GNN performance and
 PLOTTING
 o) plot_data.py: Run automatically after data processing. Generates plots
    showing distribution of input features in the generated dataset
-   categorized by truth labels for each track.
+   categorized by truth labels for each track. Also makes plots showing
+   effects of cuts on data.
 o) plot_results.py: Run automatically after GNN training. Generates plots
    comparing feature distributions of jets the GNN performed poorly on with
    the rest of the dataset. This is again categorized by the truth labels of

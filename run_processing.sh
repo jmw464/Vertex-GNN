@@ -2,7 +2,7 @@
 
 NTUPLES="user.jmwagner.26222492.Akt4EMPf_BTagging201903._000007 user.jmwagner.25874500.Akt4EMPf_BTagging201903._000005"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh07_tt05_cut_v5_nopu
+DATANAME=btag_zh07_tt05_cut_v5
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
@@ -53,3 +53,5 @@ then
 fi
 
 python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME
+
+python scripts/prune_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n $NORMED

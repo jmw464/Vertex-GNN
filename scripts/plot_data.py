@@ -7,6 +7,7 @@ import argparse
 
 import options
 from plot_functions import *
+from truth_functions import *
 
 #set ATLAS style for plots
 gROOT.LoadMacro("/global/homes/j/jmw464/ATLAS/Vertex-GNN/scripts/include/AtlasStyle.C")
@@ -25,6 +26,9 @@ def main(argv):
 
     data_path = args.data_dir
     data_name = args.data_name
+
+    b_pdgids = wd_bm + wd_bb #defined in truth_functions.py
+    c_pdgids = wd_cm + wd_cb
 
     #import options from option file
     atlasstyle = options.use_atlas_style
@@ -92,11 +96,33 @@ def main(argv):
     hist_jet_phi_c = TH1D("jet_phi_c", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
     hist_jet_phi_l = TH1D("jet_phi_l", "Jet #phi in dataset;#phi;Normalized entries", 20, -math.pi, math.pi)
 
+    hist_acc_trk_pt_b = TH1D("acc_trk_pt_b", "Number of HF tracks in b-jets as a function of track pT;pT [GeV];Entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_acc_trk_pt_c = TH1D("acc_trk_pt_c", "Number of HF tracks in c-jets as a function of track pT;pT [GeV];Entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_rej_trk_pt_b = TH1D("rej_trk_pt_b", "Number of HF tracks in b-jets as a function of track pT;pT [GeV];Entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_rej_trk_pt_c = TH1D("rej_trk_pt_c", "Number of HF tracks in c-jets as a function of track pT;pT [GeV];Entries", 20, track_pt_bound[0], track_pt_bound[1])
+    
+    hist_acc_trk_z0_b = TH1D("acc_trk_z0_b", "Number of HF tracks in b-jets as a function of track z0;z0 [mm];Entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_acc_trk_z0_c = TH1D("acc_trk_z0_c", "Number of HF tracks in c-jets as a function of track z0;z0 [mm];Entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_rej_trk_z0_b = TH1D("rej_trk_z0_b", "Number of HF tracks in b-jets as a function of track z0;z0 [mm];Entries", 20, track_z0_bound[0], track_z0_bound[1])
+    hist_rej_trk_z0_c = TH1D("rej_trk_z0_c", "Number of HF tracks in c-jets as a function of track z0;z0 [mm];Entries", 20, track_z0_bound[0], track_z0_bound[1])
+
+    hist_acc_trk_lxy_b = TH1D("acc_trk_lxy_b", "Number of HF tracks in b-jets as a function of vertex Lxy;Lxy [mm];Entries", 20, 0, 10)
+    hist_acc_trk_lxy_c = TH1D("acc_trk_lxy_c", "Number of HF tracks in c-jets as a function of vertex Lxy;Lxy [mm];Entries", 20, 0, 10)
+    hist_rej_trk_lxy_b = TH1D("rej_trk_lxy_b", "Number of HF tracks in b-jets as a function of vertex Lxy;Lxy [mm];Entries", 20, 0, 10)
+    hist_rej_trk_lxy_c = TH1D("rej_trk_lxy_c", "Number of HF tracks in c-jets as a function of vertex Lxy;Lxy [mm];Entries", 20, 0, 10)
+
+    hist_acc_trk_id_b = TH1D("acc_trk_id_b", "bH tracks as a function of bH ancestor PDG ID;PDG ID;Number of tracks",len(b_pdgids),0,len(b_pdgids))
+    hist_acc_trk_id_c = TH1D("acc_trk_id_c", "prompt cH tracks as a function of cH ancestor PDG ID;PDG ID;Number of tracks",len(c_pdgids),0,len(c_pdgids))
+    hist_acc_trk_id_btoc = TH1D("acc_trk_id_btoc", "bH->cH tracks as a function of bH ancestor PDG ID;PDG ID;Number of tracks",len(b_pdgids),0,len(b_pdgids))
+    hist_rej_trk_id_b = TH1D("rej_trk_id_b", "bH tracks as a function of bH ancestor PDG ID;PDG ID;Number of tracks",len(b_pdgids),0,len(b_pdgids))
+    hist_rej_trk_id_c = TH1D("rej_trk_id_c", "prompt cH tracks as a function of cH ancestor PDG ID;PDG ID;Number of tracks",len(c_pdgids),0,len(c_pdgids))
+    hist_rej_trk_id_btoc = TH1D("rej_trk_id_btoc", "bH->cH tracks as a function of bH ancestor PDG ID;PDG ID;Number of tracks",len(b_pdgids),0,len(b_pdgids))
+
     prof_frac_reco_eta_b = TProfile("frac_reco_eta_b", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,jet_eta_bound[0],jet_eta_bound[1])
     prof_frac_reco_eta_c = TProfile("frac_reco_eta_c", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,jet_eta_bound[0],jet_eta_bound[1])
 
-    hist_vertex_lxy_b = TH1D("vertex_lxy_b", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 200)
-    hist_vertex_lxy_c = TH1D("vertex_lxy_c", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 200)
+    hist_vertex_lxy_b = TH1D("vertex_lxy_b", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 10)
+    hist_vertex_lxy_c = TH1D("vertex_lxy_c", "Vertex Lxy in dataset;Lxy [mm];Normalized entries", 20, 0, 10)
 
     bin_edges = np.linspace(-0.5,10.5,12)
     hist_no_trk_b = TH1D("no_trk_b", "Number of tracks per jet in dataset;Number of tracks;Normalized entries", 11, bin_edges)
@@ -144,63 +170,99 @@ def main(argv):
     for filename in filename_array:
         graphs = dgl.load_graphs(filename)[0]
         for graph in graphs:
+            passed_cuts = graph.ndata['passed_cuts'].numpy()
             features_base = graph.ndata['features_base'].numpy()
             if incl_errors: features_errors = graph.ndata['features_errors'].numpy()
-            track_flavors = graph.ndata['node_info'].numpy()[:,2]
+
+            ancestor_pdgids = graph.ndata['node_info'].numpy()[:,1]
+            second_ancestor_pdgids = graph.ndata['node_info'].numpy()[:,3]
+            track_flavors = graph.ndata['node_info'].numpy()[:,4]
             jet_flavor = int(graph.ndata['graph_info'].numpy()[0,0])
             reco_jet_flavor = 0
+
             jet_pv = [graph.ndata['graph_info'].numpy()[0,1], graph.ndata['graph_info'].numpy()[0,2], graph.ndata['graph_info'].numpy()[0,3]]
             used_sv = [] #array containing secondary vertices that were already considered for relevant plots
+            
             for i in range(len(features_base[:,0])):
-                track_sv = [graph.ndata['node_info'].numpy()[i,3], graph.ndata['node_info'].numpy()[i,4], graph.ndata['node_info'].numpy()[i,5]]
-                if track_flavors[i] == 1:
-                    hist_trk_pt_b.Fill(features_base[i,0])
-                    hist_trk_theta_b.Fill(features_base[i,1])
-                    hist_trk_phi_b.Fill(features_base[i,2])
-                    hist_trk_d0_b.Fill(features_base[i,3])
-                    hist_trk_z0_b.Fill(features_base[i,4])
-                    if track_sv not in used_sv:
-                        hist_vertex_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
-                        used_sv.append(track_sv)
-                    if incl_errors:
-                        hist_trk_p_err_b.Fill(features_errors[i,0])
-                        hist_trk_theta_err_b.Fill(features_errors[i,1])
-                        hist_trk_phi_err_b.Fill(features_errors[i,2])
-                        hist_trk_d0_err_b.Fill(features_errors[i,3])
-                        hist_trk_z0_err_b.Fill(features_errors[i,4])
-                    reco_jet_flavor = 1
-                elif track_flavors[i] == 3:
-                    hist_trk_pt_btoc.Fill(features_base[i,0])
-                    hist_trk_theta_btoc.Fill(features_base[i,1])
-                    hist_trk_phi_btoc.Fill(features_base[i,2])
-                    hist_trk_d0_btoc.Fill(features_base[i,3])
-                    hist_trk_z0_btoc.Fill(features_base[i,4])
-                    if track_sv not in used_sv:
-                        hist_vertex_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
-                        used_sv.append(track_sv)
-                    if incl_errors:
-                        hist_trk_p_err_btoc.Fill(features_errors[i,0])
-                        hist_trk_theta_err_btoc.Fill(features_errors[i,1])
-                        hist_trk_phi_err_btoc.Fill(features_errors[i,2])
-                        hist_trk_d0_err_btoc.Fill(features_errors[i,3])
-                        hist_trk_z0_err_btoc.Fill(features_errors[i,4])
-                    reco_jet_flavor = 1
-                elif track_flavors[i] == 2:
-                    hist_trk_pt_c.Fill(features_base[i,0])
-                    hist_trk_theta_c.Fill(features_base[i,1])
-                    hist_trk_phi_c.Fill(features_base[i,2])
-                    hist_trk_d0_c.Fill(features_base[i,3])
-                    hist_trk_z0_c.Fill(features_base[i,4])
-                    if track_sv not in used_sv:
-                        hist_vertex_lxy_c.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
-                        used_sv.append(track_sv)
-                    if incl_errors:
-                        hist_trk_p_err_c.Fill(features_errors[i,0])
-                        hist_trk_theta_err_c.Fill(features_errors[i,1])
-                        hist_trk_phi_err_c.Fill(features_errors[i,2])
-                        hist_trk_d0_err_c.Fill(features_errors[i,3])
-                        hist_trk_z0_err_c.Fill(features_errors[i,4])
-                    if not reco_jet_flavor: reco_jet_flavor = 2
+                track_sv = [graph.ndata['node_info'].numpy()[i,5], graph.ndata['node_info'].numpy()[i,6], graph.ndata['node_info'].numpy()[i,7]]
+                if passed_cuts[i] == 1:
+                    if track_flavors[i] == 1:
+                        hist_trk_pt_b.Fill(features_base[i,0])
+                        hist_trk_theta_b.Fill(features_base[i,1])
+                        hist_trk_phi_b.Fill(features_base[i,2])
+                        hist_trk_d0_b.Fill(features_base[i,3])
+                        hist_trk_z0_b.Fill(features_base[i,4])
+                        hist_acc_trk_id_b.Fill(b_pdgids.index(abs(ancestor_pdgids[i])))
+                        if track_sv not in used_sv:
+                            hist_vertex_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+                            used_sv.append(track_sv)
+                        if incl_errors:
+                            hist_trk_p_err_b.Fill(features_errors[i,0])
+                            hist_trk_theta_err_b.Fill(features_errors[i,1])
+                            hist_trk_phi_err_b.Fill(features_errors[i,2])
+                            hist_trk_d0_err_b.Fill(features_errors[i,3])
+                            hist_trk_z0_err_b.Fill(features_errors[i,4])
+                        reco_jet_flavor = 1
+                    elif track_flavors[i] == 3:
+                        hist_trk_pt_btoc.Fill(features_base[i,0])
+                        hist_trk_theta_btoc.Fill(features_base[i,1])
+                        hist_trk_phi_btoc.Fill(features_base[i,2])
+                        hist_trk_d0_btoc.Fill(features_base[i,3])
+                        hist_trk_z0_btoc.Fill(features_base[i,4])
+                        hist_acc_trk_id_btoc.Fill(b_pdgids.index(abs(second_ancestor_pdgids[i])))
+                        if track_sv not in used_sv:
+                            hist_vertex_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+                            used_sv.append(track_sv)
+                        if incl_errors:
+                            hist_trk_p_err_btoc.Fill(features_errors[i,0])
+                            hist_trk_theta_err_btoc.Fill(features_errors[i,1])
+                            hist_trk_phi_err_btoc.Fill(features_errors[i,2])
+                            hist_trk_d0_err_btoc.Fill(features_errors[i,3])
+                            hist_trk_z0_err_btoc.Fill(features_errors[i,4])
+                        reco_jet_flavor = 1
+                    elif track_flavors[i] == 2:
+                        hist_trk_pt_c.Fill(features_base[i,0])
+                        hist_trk_theta_c.Fill(features_base[i,1])
+                        hist_trk_phi_c.Fill(features_base[i,2])
+                        hist_trk_d0_c.Fill(features_base[i,3])
+                        hist_trk_z0_c.Fill(features_base[i,4])
+                        hist_acc_trk_id_c.Fill(c_pdgids.index(abs(ancestor_pdgids[i])))
+                        if track_sv not in used_sv:
+                            hist_vertex_lxy_c.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+                            used_sv.append(track_sv)
+                        if incl_errors:
+                            hist_trk_p_err_c.Fill(features_errors[i,0])
+                            hist_trk_theta_err_c.Fill(features_errors[i,1])
+                            hist_trk_phi_err_c.Fill(features_errors[i,2])
+                            hist_trk_d0_err_c.Fill(features_errors[i,3])
+                            hist_trk_z0_err_c.Fill(features_errors[i,4])
+                        if not reco_jet_flavor: reco_jet_flavor = 2
+
+                    if jet_flavor == 1:
+                        hist_acc_trk_pt_b.Fill(abs(1/features_base[i,0]))
+                        hist_acc_trk_z0_b.Fill(features_base[i,4])
+                        hist_acc_trk_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+                    elif jet_flavor == 2:
+                        hist_acc_trk_pt_c.Fill(abs(1/features_base[i,0]))
+                        hist_acc_trk_z0_c.Fill(features_base[i,4])
+                        hist_acc_trk_lxy_c.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+
+                else:
+                    if track_flavors[i] == 1:
+                        hist_rej_trk_id_b.Fill(b_pdgids.index(abs(ancestor_pdgids[i])))
+                    elif track_flavors[i] == 3:
+                        hist_rej_trk_id_btoc.Fill(b_pdgids.index(abs(second_ancestor_pdgids[i])))
+                    elif track_flavors[i] == 2:
+                        hist_rej_trk_id_c.Fill(c_pdgids.index(abs(ancestor_pdgids[i])))
+                    if jet_flavor == 1:
+                        hist_rej_trk_pt_b.Fill(abs(1/features_base[i,0]))
+                        hist_rej_trk_z0_b.Fill(features_base[i,4])
+                        hist_rej_trk_lxy_b.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+                    elif jet_flavor == 2:
+                        hist_rej_trk_pt_c.Fill(abs(1/features_base[i,0]))
+                        hist_rej_trk_z0_c.Fill(features_base[i,4])
+                        hist_rej_trk_lxy_c.Fill(np.linalg.norm(np.array(jet_pv)-np.array(track_sv)))
+
             jet_classification[jet_flavor,reco_jet_flavor] += 1
             if jet_flavor == 1:
                 hist_jet_pt_b.Fill(features_base[0,5])
@@ -243,6 +305,16 @@ def main(argv):
         plot_hist([hist_trk_phi_err_b, hist_trk_phi_err_btoc, hist_trk_phi_err_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_phi_err.png", "HIST", scaling=[mean_features[10],std_features[10]])
         plot_hist([hist_trk_d0_err_b, hist_trk_d0_err_btoc, hist_trk_d0_err_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_d0_err.png", "HIST", scaling=[mean_features[11],std_features[11]])
         plot_hist([hist_trk_z0_err_b, hist_trk_z0_err_btoc, hist_trk_z0_err_c], ["bH", "bH->cH", "prompt cH"], True, False, True, data_path+data_name+"_trk_z0_err.png", "HIST", scaling=[mean_features[12],std_features[12]])
+
+    plot_hist([hist_acc_trk_pt_b, hist_rej_trk_pt_b], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_pt_b.png", "HIST")
+    plot_hist([hist_acc_trk_pt_c, hist_rej_trk_pt_c], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_pt_c.png", "HIST")
+    plot_hist([hist_acc_trk_z0_b, hist_rej_trk_z0_b], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_z0_b.png", "HIST")
+    plot_hist([hist_acc_trk_z0_c, hist_rej_trk_z0_c], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_z0_c.png", "HIST")
+    plot_hist([hist_acc_trk_lxy_b, hist_rej_trk_lxy_b], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_lxy_b.png", "HIST")
+    plot_hist([hist_acc_trk_lxy_c, hist_rej_trk_lxy_c], ["passed", "cut"], False, False, True, data_path+data_name+"_cut_trk_lxy_c.png", "HIST")
+    plot_bar([hist_acc_trk_id_b, hist_rej_trk_id_b], b_pdgids, ["passed", "cut"], data_path+data_name+"_trk_ancid_b.png", "HIST")
+    plot_bar([hist_acc_trk_id_c, hist_rej_trk_id_c], c_pdgids, ["passed", "cut"], data_path+data_name+"_trk_ancid_c.png", "HIST")
+    plot_bar([hist_acc_trk_id_btoc, hist_rej_trk_id_btoc], b_pdgids, ["passed", "cut"], data_path+data_name+"_trk_ancid_btoc.png", "HIST")
 
 
 if __name__ == '__main__':

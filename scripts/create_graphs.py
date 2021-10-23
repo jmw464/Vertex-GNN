@@ -96,7 +96,8 @@ def main(argv):
         if incl_corr: node_features_corrs = np.zeros((ntracks,nnfeatures_corrs))
         #edge_features = np.zeros((nedges,nefeatures)) 
         jet_info = np.zeros((ntracks, 4)) #store jet info - jet truth label (0 = light, 1 = b, 2 = c), jet pv coordinates
-        track_info = np.zeros((ntracks,6))
+        track_info = np.zeros((ntracks,8))
+
         ancestors = np.zeros((ntracks,1))
         second_ancestors = np.zeros((ntracks,1))
         flavors = np.zeros((ntracks,1))
@@ -104,6 +105,7 @@ def main(argv):
         mult_labels = np.zeros((nedges,1))
         flavor_labels = np.zeros((nedges,1))
         reco_labels = np.zeros((ntracks,2)) #use of track in SV0, SV1
+        passed_cuts = np.zeros((ntracks,1))
         
         #read in features
         for j in range(ntracks):
@@ -150,12 +152,16 @@ def main(argv):
             jet_phi = infile['jfeatures']['phi'][ientry]
 
             ancestors[j] = infile['labels']['ancestor'][track_offset+j]
+            ancestors_pdgid = infile['labels']['ancestor_pdgid'][track_offset+j]
             second_ancestors[j] = infile['labels']['second_ancestor'][track_offset+j]
+            second_ancestors_pdgid = infile['labels']['second_ancestor_pdgid'][track_offset+j]
             flavors[j] = infile['labels']['flavor'][track_offset+j]
             track_svx = infile['labels']['track_svx'][track_offset+j]
             track_svy = infile['labels']['track_svy'][track_offset+j]
             track_svz = infile['labels']['track_svz'][track_offset+j]
-            track_info[j] = [ancestors[j], second_ancestors[j], flavors[j], track_svx, track_svy, track_svz]
+            track_info[j] = [ancestors[j], ancestors_pdgid, second_ancestors[j], second_ancestors_pdgid, flavors[j], track_svx, track_svy, track_svz]
+
+            passed_cuts[j] = infile['labels']['passed_cuts'][track_offset+j]
 
             node_features_base[j] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
             if incl_errors:
@@ -217,6 +223,7 @@ def main(argv):
             g.ndata['graph_info'] = th.from_numpy(jet_info)
             g.ndata['node_info'] = th.from_numpy(track_info)
             g.ndata['reco_labels'] = th.from_numpy(reco_labels)
+            g.ndata['passed_cuts'] = th.from_numpy(passed_cuts)
             g.edata['bin_labels'] = th.from_numpy(bin_labels)
             g.edata['mult_labels'] = th.from_numpy(mult_labels)
             g.edata['flavor_labels'] = th.from_numpy(flavor_labels)

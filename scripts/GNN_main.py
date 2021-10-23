@@ -67,9 +67,9 @@ def main(argv):
     
     #set relevant filenames
     if use_normed:
-        ext = ".normed"
+        ext = ".normed.pruned"
     else:
-        ext = ""
+        ext = ".pruned"
     paramfile_name = infile_path+infile_name+"_params"
     train_infile_name = infile_path+infile_name+"_train"+ext+".bin"
     val_infile_name = infile_path+infile_name+"_val"+ext+".bin"
