@@ -160,11 +160,13 @@ def get_hf_relatives(particle, particle_dict, particle_list, mode, skip): #skip 
     return particle_list
 
 
-def classify_track(index, particle_dict, track_dict):
+def classify_track(index, particle_dict, track_dict, primary_vertex):
     barcode = track_dict[index].barcode
     hf_barcode = track_dict[index].hf_ancestor
-    track_vertex = track_dict[index].vertex
-    if hf_barcode > 0: primary_distance = np.linalg.norm(track_vertex-particle_dict[hf_barcode].dv)
+    track_vertex = track_dict[index].vertex #track production vertex
+    if hf_barcode > 0:
+        hf_vertex = particle_dict[hf_barcode].dv #HF decay vertex (SV for b and prompt c tracks)
+        sv_distance = np.linalg.norm(track_vertex-hf_vertex)
 
     min_distance = -1
     if barcode < -990:
@@ -178,12 +180,15 @@ def classify_track(index, particle_dict, track_dict):
             if (min_distance == -1 or distance < min_distance) and id_particle(particle_dict[bh_barcode].pdgid) == 'bh':
                 min_distance = distance
                 track_dict[index].btoc_ancestor = bh_barcode
+                track_dict[index].ancestor_vertex = particle_dict[bh_barcode].dv
         if track_dict[index].btoc_ancestor > 0:
             return 'btoc'
         else:
             return 'c'
     elif hf_barcode > 0 and id_particle(particle_dict[hf_barcode].pdgid) == 'bh':
         return 'b'
+    elif np.linalg.norm(track_vertex-primary_vertex) < 1e-3: #primary vertex track
+        return 'p'
     else:
         return 'o'
 

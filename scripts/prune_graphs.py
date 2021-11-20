@@ -6,14 +6,16 @@ import argparse
 
 import options
 
+
 def prune_graph(graph):
     nodes_to_cut = []
     cut_array = graph.ndata['passed_cuts']
     for i in range(len(cut_array)):
         if cut_array[i] == 0:
             nodes_to_cut.append(i)
-    if nodes_to_cut: graph.remove_nodes(nodes_to_cut)
+    graph.remove_nodes(nodes_to_cut,store_ids=False)
     return graph
+
 
 def main(argv):
 
@@ -58,7 +60,7 @@ def main(argv):
 
         random.shuffle(g_list)
         dgl.save_graphs(infile_prefix+dataset_type+ext+'.pruned.bin', g_list)
-    
+   
     #store important values in paramfile
     paramfile = open(infile_prefix+'params', "w")
     paramfile.write(str(dataset_len[0])+'\n') #train length

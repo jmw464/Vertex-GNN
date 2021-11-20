@@ -3,7 +3,7 @@
 RUN=25 #run number - used to distinguish output
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
-DATANAME=btag_zh07_tt05_cut_v5_pv #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
+DATANAME=btag_zh06_tt06_cut_v6_alltrk #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 

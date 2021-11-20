@@ -166,12 +166,13 @@ def plot_profile(profile_list, labels, ylimit, overflow, filename):
     del canv
 
 
-def plot_bar(histlist, axislabels, labels, filename, options):
+def plot_bar(histlist, axislabels, labels, norm, log, filename, options):
     canv = TCanvas("c1", "c1", 800, 600)
     canv.SetTopMargin(10)
     canv.SetRightMargin(100)
+    if log: gPad.SetLogy()
     histstack = THStack("stack",histlist[0].GetTitle())
-    legend = TLegend(0.76,0.88-0.08*len(histlist),0.91,0.88,'','NDC')
+    if labels: legend = TLegend(0.76,0.88-0.08*len(histlist),0.91,0.88,'','NDC')
     colorlist = [4,8,2,6,1]
 
     if options: options += " NOSTACK"
@@ -181,9 +182,11 @@ def plot_bar(histlist, axislabels, labels, filename, options):
     for i in range(len(histlist)):
         histlist[i].SetLineColorAlpha(colorlist[i],0.65)
         histlist[i].SetLineWidth(3)
+        entries = histlist[i].GetEntries()
 
+        if entries and norm: histlist[i].Scale(1./entries)
         if histlist[i].GetMaximum() > maximum: maximum = histlist[i].GetMaximum()
-        legend.AddEntry(histlist[i], labels[i], "l")
+        if labels: legend.AddEntry(histlist[i], labels[i], "l")
         histstack.Add(histlist[i])
 
     histstack.SetMaximum(maximum*1.4)
@@ -195,11 +198,13 @@ def plot_bar(histlist, axislabels, labels, filename, options):
     for i, label in enumerate(axislabels):
         histstack.GetXaxis().ChangeLabel(i+1,-1,-1,-1,-1,-1,str(label))
 
-    legend.SetTextSize(0.02)
-    legend.SetFillStyle(0)
-    legend.SetBorderSize(0)
-    legend.Draw("SAME")
+    if labels:
+        legend.SetTextSize(0.02)
+        legend.SetFillStyle(0)
+        legend.SetBorderSize(0)
+        legend.Draw("SAME")
     canv.SaveAs(filename)
+    if log: gPad.Clear()
     canv.Clear()
     del canv
 

@@ -52,7 +52,8 @@ def main(argv):
     incl_errors = options.incl_errors
     incl_corr = options.incl_corr
     incl_hits = options.incl_hits
-    incl_btoc = options.incl_btoc
+    incl_vweight = options.incl_vweight
+    incl_btoc = options.incl_btoc 
 
     #file names
     infile_name = data_path+data_name+".hdf5"
@@ -76,8 +77,8 @@ def main(argv):
         current_jet = infile['info']['jet'][ientry]
         ntracks =  infile['info']['ntracks'][ientry]
         pv_x = infile['efeatures']['event_vx'][event_index]
-        pv_y = infile['efeatures']['event_vx'][event_index]
-        pv_z = infile['efeatures']['event_vx'][event_index]
+        pv_y = infile['efeatures']['event_vy'][event_index]
+        pv_z = infile['efeatures']['event_vz'][event_index]
         nedges = ntracks*(ntracks-1)
 
         jet_flavor = infile['info']['jet_flavor'][ientry]
@@ -91,6 +92,7 @@ def main(argv):
 
         #initialize empty arrays
         node_features_base = np.zeros((ntracks,nnfeatures_base))
+        if incl_vweight: node_features_vweight = np.zeros((ntracks,1))
         if incl_errors: node_features_errors = np.zeros((ntracks,nnfeatures_errors))
         if incl_hits: node_features_hits = np.zeros((ntracks,nnfeatures_hits))
         if incl_corr: node_features_corrs = np.zeros((ntracks,nnfeatures_corrs))
@@ -116,6 +118,8 @@ def main(argv):
             track_d0 = infile['tfeatures']['d0'][track_offset+j]
             track_z0 = infile['tfeatures']['z0'][track_offset+j]
             track_q = infile['tfeatures']['q'][track_offset+j]
+            if incl_vweight:
+                track_vweight = infile['tfeatures']['vweight'][track_offset+j]
             if incl_errors:
                 track_cov_d0d0 = math.sqrt(infile['tfeatures']['cov_d0d0'][track_offset+j])
                 track_cov_z0z0 = math.sqrt(infile['tfeatures']['cov_z0z0'][track_offset+j])
@@ -164,6 +168,8 @@ def main(argv):
             passed_cuts[j] = infile['labels']['passed_cuts'][track_offset+j]
 
             node_features_base[j] = [track_q/track_pt, track_theta, track_phi, track_d0, track_z0, jet_pt, jet_eta, jet_phi]
+            if incl_vweight:
+                node_features_vweight[j] = [track_vweight]
             if incl_errors:
                 node_features_errors[j] = [track_cov_qoverpqoverp, track_cov_thetatheta, track_cov_phiphi, track_cov_d0d0, track_cov_z0z0]
             if incl_corr:
@@ -206,10 +212,8 @@ def main(argv):
                     bin_labels[counter:counter+2] = incl_btoc
                     mult_labels[counter:counter+2] = incl_btoc
                     flavor_labels[counter:counter+2] = 3*incl_btoc
-                elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 0 and flavors[k] == 0: #matching direct ancestors for secondaries (S to S)
-                    flavor_labels[counter:counter+2] = 4
-                elif ancestors[k] == ancestors[j] and ancestors[k] < 0: #matching fake vertices with no HF ancestors
-                    flavor_labels[counter:counter+2] = 4
+                elif ancestors[k] == ancestors[j] and ancestors[k] != 0: #matching all other direct ancestors (P to P, S to S)
+                    flavor_labels[counter:counter+2] = flavors[k]
 
                 counter += 2
 
@@ -217,6 +221,7 @@ def main(argv):
         if ntracks > 1:
             g = dgl.graph((create_edge_list(ntracks)))
             g.ndata['features_base'] = th.from_numpy(node_features_base)
+            if incl_vweight: g.ndata['features_vweight'] = th.from_numpy(node_features_vweight)
             if incl_errors: g.ndata['features_errors'] = th.from_numpy(node_features_errors)
             if incl_hits: g.ndata['features_hits'] = th.from_numpy(node_features_hits)
             if incl_corr: g.ndata['features_corr'] = th.from_numpy(node_features_corrs)

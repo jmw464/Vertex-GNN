@@ -1,12 +1,12 @@
 #!/bin/bash
 
-NTUPLES="user.jmwagner.26222492.Akt4EMPf_BTagging201903._000007 user.jmwagner.25874500.Akt4EMPf_BTagging201903._000005"
+NTUPLES="user.jmwagner.27266824.Akt4EMPf_BTagging201903._000006 user.jmwagner.27266826.Akt4EMPf_BTagging201903._000006"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh07_tt05_cut_v5
+DATANAME=btag_zh06_tt06_cut_v6
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
-ENTRIES=( 150000 150000 ) #jets used per file (after cuts)
+ENTRIES=( 150 150 ) #jets used per file (after cuts)
 
 NORMED=1
 

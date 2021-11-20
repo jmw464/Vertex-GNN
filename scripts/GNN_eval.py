@@ -138,7 +138,7 @@ def find_vertices_bin(graph, mode, score_threshold):
 def compare_vertices(true_vertices, reco_vertices):
 
     vertex_cm = np.zeros((3,3), dtype=int) #no sv, one sv, more than one sv (first index = true, second index = predicted)
-    vertex_metrics = []
+    vertex_metrics = [[0,1] for i in range(len(reco_vertices))] #############
     vertex_assoc = np.empty(len(true_vertices), dtype=int) #index is true vertex, entry is reco vertex
     vertex_assoc.fill(-1) #true vertices with -1 have no reco association
 
@@ -178,7 +178,7 @@ def compare_vertices(true_vertices, reco_vertices):
         if vertex_assoc[i] != -1 and len(reco_vertices) > 0:
             reco_index = int(vertex_assoc[i])
             correct_tracks = np.intersect1d(reco_vertices[reco_index], true_vertices[i])
-            vertex_metrics.append([correct_tracks.size/true_vertices[i].size, (reco_vertices[reco_index].size-correct_tracks.size)/reco_vertices[reco_index].size])
+            vertex_metrics[reco_index] = [correct_tracks.size/true_vertices[i].size, (reco_vertices[reco_index].size-correct_tracks.size)/reco_vertices[reco_index].size]
 
     return vertex_cm, vertex_metrics, vertex_assoc
 

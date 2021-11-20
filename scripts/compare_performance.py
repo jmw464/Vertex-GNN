@@ -52,11 +52,17 @@ def main(argv):
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
     normfile_name = infile_path+infile_name+"_norm"
 
+    trk_flavor_labels = ['nm','b','c','btoc','p','s','o']
+
     #calculate number of features in graphs
     sample_graph = (dgl.load_graphs(graphfile_name, [0]))[0][0]
-    incl_errors = incl_corr = incl_hits = False
+    incl_errors = incl_corr = incl_hits = incl_vweight = False
     nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
     nnfeatures = nnfeatures_base
+    if 'features_vweight' in sample_graph.ndata.keys():
+        nnfeatures_vweight = sample_graph.ndata['features_vweight'].size()[1]
+        incl_vweight = True
+        nnfeatures += nnfeatures_vweight
     if 'features_errors' in sample_graph.ndata.keys():
         nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
         incl_errors = True
@@ -73,7 +79,9 @@ def main(argv):
     #read in length of test file
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
-        test_len = int(paramfile.readline())
+        train_len = int(float(paramfile.readline()))
+        val_len = int(float(paramfile.readline()))
+        test_len = int(float(paramfile.readline()))
     else:
         print("ERROR: Specified parameter file not found")
         return 1
@@ -161,6 +169,9 @@ def main(argv):
     sv1_eta_profile_phys_fr = TProfile("sv1_eta_phys_fr", "SV reconstruction physics fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_phys_fr = TProfile("gnn_eta_phys_fr", "SV reconstruction physics fake rate as a function of jet eta;eta;Fake rate",20,jet_eta_bound[0],jet_eta_bound[1])
     
+    gnn_trk_assoc_hist_fake = TH1D("gnn_trk_assoc_fake", "Origin of tracks in fake GNN vertices;Track flavor label;Number of tracks", len(trk_flavor_labels), 0, len(trk_flavor_labels))
+    gnn_trk_assoc_hist_true = TH1D("gnn_trk_assoc_true", "Origin of misassociated tracks in true GNN vertices;Track flavor label; Number of tracks", len(trk_flavor_labels), 0, len(trk_flavor_labels))
+
     hist_pc_list = [sv1_corrp_hist, gnn_corrp_hist]
     hist_pf_list = [sv1_fakep_hist, gnn_fakep_hist]
 
@@ -205,6 +216,17 @@ def main(argv):
                 jet_eta = jet_eta*jet_eta_std+jet_eta_mean
 
             no_true_sv_hist_tot.Fill(len(true_vertices))
+
+            #check false track associations for each vertex
+            for i in range(len(gnn_vertices)):
+                vertex = gnn_vertices[i]
+                true_vertex_assoc = np.where(gnn_vertex_assoc == i)[0]
+                for track in vertex:
+                    trk_label = g.ndata['node_info'][track,4]
+                    if not true_vertex_assoc: #vertex association not available - fake GNN vertex
+                        gnn_trk_assoc_hist_fake.Fill(trk_label)
+                    elif track not in true_vertices[true_vertex_assoc[0]]:
+                        gnn_trk_assoc_hist_true.Fill(trk_label)
 
             no_b = no_c = 0
             for i in range(len(true_vertices)):
@@ -369,6 +391,9 @@ def main(argv):
     plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_b.png")
     plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_c.png")
     plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_b.png")
+    
+    plot_bar([gnn_trk_assoc_hist_fake], trk_flavor_labels, [], False, True, outfile_name+"_trk_assoc_fake.png", "HIST")
+    plot_bar([gnn_trk_assoc_hist_true], trk_flavor_labels, [], False, True, outfile_name+"_trk_assoc_true.png", "HIST")
 
     ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]
@@ -457,13 +482,13 @@ def main(argv):
         alg_roc_curve_c = TGraph(len(c_alg_efficiency), c_alg_efficiency, alg_fake_rate)
         sv1_alg_eff_b = TGraph(len(sv1_b_alg_efficiency), sv1_b_alg_efficiency, sv1_alg_fake_rate)
         sv1_alg_eff_c = TGraph(len(sv1_c_alg_efficiency), sv1_c_alg_efficiency, sv1_alg_fake_rate)
-        plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, [0.5,1.], [0.,0.5], "algorithmic", outfile_name+"_alg_roc.png")
+        plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, [0.0,1.0], [0.,1.0], "algorithmic", outfile_name+"_alg_roc.png")
 
         phys_roc_curve_b = TGraph(len(b_phys_efficiency), b_phys_efficiency, phys_fake_rate)
         phys_roc_curve_c = TGraph(len(c_phys_efficiency), c_phys_efficiency, phys_fake_rate)
         sv1_phys_eff_b = TGraph(len(sv1_b_phys_efficiency), sv1_b_phys_efficiency, sv1_phys_fake_rate)
         sv1_phys_eff_c = TGraph(len(sv1_c_phys_efficiency), sv1_c_phys_efficiency, sv1_phys_fake_rate)
-        plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, [0.0,1.], [0.,0.3], "physics", outfile_name+"_phys_roc.png")
+        plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, [0.0,1.0], [0.,1.0], "physics", outfile_name+"_phys_roc.png")
 
     canv1 = TCanvas("c1", "c1", 800, 600)
 

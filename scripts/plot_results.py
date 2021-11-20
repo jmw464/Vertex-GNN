@@ -48,9 +48,13 @@ def main(argv):
 
     #calculate number of features in graphs
     sample_graph = (dgl.load_graphs(graphfile_name, [0]))[0][0]
-    incl_errors = incl_corr = incl_hits = False
+    incl_errors = incl_corr = incl_hits = incl_vweight = False
     nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
     nnfeatures = nnfeatures_base
+    if 'features_vweight' in sample_graph.ndata.keys():
+        nnfeatures_vweight = sample_graph.ndata['features_vweight'].size()[1]
+        incl_vweight = True
+        nnfeatures += nnfeatures_vweight
     if 'features_errors' in sample_graph.ndata.keys():
         nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
         incl_errors = True
@@ -67,7 +71,9 @@ def main(argv):
     #read in length of test file
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
-        test_len = int(paramfile.readline())
+        train_len = int(float(paramfile.readline()))
+        val_len = int(float(paramfile.readline()))
+        test_len = int(float(paramfile.readline()))
     else:
         print("ERROR: Specified parameter file not found")
         return 1

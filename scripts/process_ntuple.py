@@ -30,17 +30,18 @@ def main(argv):
     outfile = h5py.File(args.outfile_dir+args.ntuple+".hdf5", "w")
 
     #import options from option file
-    remove_pv = options.remove_pv
-    remove_pileup = options.remove_pileup
     jet_pt_cut = options.jet_pt_cut
     jet_eta_cut = options.jet_eta_cut
     track_pt_cut = options.track_pt_cut
     track_eta_cut = options.track_eta_cut
     track_z0_cut = options.track_z0_cut
+    vweight_pileup_cut = options.vweight_pileup_cut
+    vweight_pv_cut = options.vweight_pv_cut
     vertex_threshold = options.vertex_threshold
     incl_errors = options.incl_errors
     incl_corr = options.incl_corr
     incl_hits = options.incl_hits
+    incl_vweight = options.incl_vweight
 
     #general jet info
     info = dict()
@@ -64,6 +65,8 @@ def main(argv):
     tfeatures['d0'] = []
     tfeatures['z0'] = []
     tfeatures['q'] = []
+    if incl_vweight:
+        tfeatures['vweight'] = []
     if incl_errors:
         tfeatures['cov_d0d0'] = []
         tfeatures['cov_z0z0'] = []
@@ -126,7 +129,7 @@ def main(argv):
                 rem_trk = 0
                 nTrack =  entry.jet_trk_pt[i].size()
                 for j in range(nTrack):
-                    pv_condition = (remove_pv and entry.jet_trk_isPV_reco[i][j] == 1) or (remove_pileup and entry.jet_trk_isPV_reco[i][j] == 2)
+                    pv_condition = (entry.jet_trk_vertex_weight[i][j] > vweight_pv_cut and entry.jet_trk_vertex_type[i][j] == 1) or (entry.jet_trk_vertex_weight[i][j] > vweight_pileup_cut and entry.jet_trk_vertex_type[i][j] == 2)
                     if check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut) and not pv_condition:
                         rem_trk += 1
                 
@@ -154,6 +157,8 @@ def main(argv):
                 t_d0 = []
                 t_z0 = []
                 t_q = []
+                if incl_vweight:
+                    t_vweight = []
                 if incl_errors:
                     t_cov_d0d0 = []
                     t_cov_z0z0 = []
@@ -204,6 +209,8 @@ def main(argv):
                     t_d0.append(entry.jet_trk_d0[i][j])
                     t_z0.append(entry.jet_trk_z0[i][j])
                     t_q.append(entry.jet_trk_charge[i][j])
+                    if incl_vweight:
+                        t_vweight.append(entry.jet_trk_vertex_weight[i][j])
                     if incl_errors:
                         t_cov_d0d0.append(entry.jet_trk_cov_d0d0[i][j])
                         t_cov_z0z0.append(entry.jet_trk_cov_z0z0[i][j])
@@ -234,7 +241,7 @@ def main(argv):
                         t_nBLSplit.append(entry.jet_trk_nsplitBLHits[i][j])
                     t_algo.append(entry.jet_trk_algo[i][j])
                     
-                    pv_condition = (remove_pv and entry.jet_trk_isPV_reco[i][j] == 1) or (remove_pileup and entry.jet_trk_isPV_reco[i][j] == 2)
+                    pv_condition = (entry.jet_trk_vertex_weight[i][j] > vweight_pv_cut and entry.jet_trk_vertex_type[i][j] == 1) or (entry.jet_trk_vertex_weight[i][j] > vweight_pileup_cut and entry.jet_trk_vertex_type[i][j] == 2)
                     if not pv_condition and check_track(entry, i, j, track_pt_cut, track_eta_cut, track_z0_cut):
                         rem_trk += 1
                         t_passed_cuts.append(1)
@@ -246,46 +253,54 @@ def main(argv):
 
                 #perform track classification
                 for ti in track_dict:
-                    t_class = classify_track(ti, particle_dict, track_dict)
+                    t_class = classify_track(ti, particle_dict, track_dict, primary_vertex)
                     track_dict[ti].classification = t_class
-                    if t_class == 'o':
+                    if t_class == 'o' or t_class == 'p':
                         um_other_tracks = np.append(um_other_tracks, ti)
 
-                #give tracks not associated with HF hadrons unique ancestor barcodes to group them (<0 for vertices not originating from HF hadrons)
-                current_ancestor = -1
+                #give tracks not associated with HF hadrons unique ancestor barcodes to group them (<0 for vertices not originating from HF hadrons, -1 is reserved for PV tracks)
+                current_ancestor = -2
                 for ti in track_dict:
                     for tj in track_dict:
                         vertex_distance = np.linalg.norm(track_dict[ti].vertex - track_dict[tj].vertex)
                         if ti != tj and vertex_distance <= vertex_threshold:
                             if ti in um_other_tracks:
                                 if track_dict[ti].classification == 'o': track_dict[ti].hf_ancestor = current_ancestor
+                                elif track_dict[ti].classification == 'p': track_dict[ti].hf_ancestor = -1
                                 if track_dict[tj].classification == 'o': track_dict[tj].hf_ancestor = current_ancestor
+                                elif track_dict[tj].classification == 'p': track_dict[tj].hf_ancestor = -1
                                 um_other_tracks = np.delete(um_other_tracks, np.where(um_other_tracks == ti))
                                 um_other_tracks = np.delete(um_other_tracks, np.where(um_other_tracks == tj))
                                 current_ancestor -= 1
                             elif tj in um_other_tracks:
                                 if track_dict[tj].classification == 'o': track_dict[tj].hf_ancestor = track_dict[ti].hf_ancestor
+                                elif track_dict[tj].classification == 'p': track_dict[tj].hf_ancestor = -1
                                 um_other_tracks = np.delete(um_other_tracks, np.where(um_other_tracks == tj))
             
                 #save relevant label data
                 for ti in track_dict:
                     flavor = track_dict[ti].classification
+                    ancestor_pdgid = 0
+                    second_ancestor_pdgid = 0
+
                     if flavor == 'b':
                         t_flavor.append(1)
                         ancestor_pdgid = particle_dict[track_dict[ti].hf_ancestor].pdgid 
-                        second_ancestor_pdgid = 0
                     elif flavor == 'c':
                         t_flavor.append(2)
                         ancestor_pdgid = particle_dict[track_dict[ti].hf_ancestor].pdgid 
-                        second_ancestor_pdgid = 0 
                     elif flavor == 'btoc':
                         t_flavor.append(3)
                         ancestor_pdgid = particle_dict[track_dict[ti].hf_ancestor].pdgid 
                         second_ancestor_pdgid = particle_dict[track_dict[ti].btoc_ancestor].pdgid
-                    else:
+                    elif flavor == 'p':
+                        t_flavor.append(4)
+                    elif flavor == 's':
+                        t_flavor.append(5)
+                    elif flavor == 'o':
+                        t_flavor.append(6)
+                    elif flavor == 'nm':
                         t_flavor.append(0)
-                        ancestor_pdgid = 0 
-                        second_ancestor_pdgid = 0
 
                     t_ancestor.append(track_dict[ti].hf_ancestor)
                     t_ancestor_pdgid.append(ancestor_pdgid)
@@ -307,6 +322,8 @@ def main(argv):
                 tfeatures['d0'].extend(t_d0)
                 tfeatures['z0'].extend(t_z0)
                 tfeatures['q'].extend(t_q)
+                if incl_vweight:
+                    tfeatures['vweight'].extend(t_vweight)
                 if incl_errors:
                     tfeatures['cov_d0d0'].extend(t_cov_d0d0)
                     tfeatures['cov_z0z0'].extend(t_cov_z0z0)

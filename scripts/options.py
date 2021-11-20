@@ -22,13 +22,14 @@ jet_eta_cut = 2.5 #maximum allowed |jet eta| value (default <2.5)
 track_pt_cut = 650 #minimum required track pT value
 track_eta_cut = 2.5 #maximum allowed |track eta| value (default: <2.5)
 track_z0_cut = 20 #maximum allowed |track z0| value
-remove_pv = True #toggle to remove all tracks that are already associated with the primary vertex
-remove_pileup = True #toggle to remove all tracks taht are already associated with pileup vertices
+vweight_pileup_cut = 0.95 #maximum allowed vertex weight value (pileup vertex association)
+vweight_pv_cut = 0.95 #maximum allowed vertex weight value (primary vertex association)
 
 #input data parameters - PROCESSING, GNN
 incl_errors = True #include diagonal covariance matrix GNN features
 incl_corr = False #include off-diagonal covariance matrix GNN features
 incl_hits = True #include GNN features related to low-level hit information
+incl_vweight = True #include vertex weight as GNN feature
 
 #neural network options - GNN
 load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)

@@ -26,11 +26,16 @@ def main(argv):
     test_outfile_name = data_path+data_name+"_test.normed.bin"
     normfile_name = data_path+data_name+"_norm"
 
-    incl_errors = incl_hits = incl_corr = False
+    incl_errors = incl_hits = incl_corr = incl_vweight = False
     train_graphs = dgl.load_graphs(train_infile_name)[0]
     num_features_base = train_graphs[0].ndata['features_base'].size()[1]
     mean_features_base = np.zeros(num_features_base)
     std_features_base = np.zeros(num_features_base)
+    if 'features_vweight' in train_graphs[0].ndata.keys():
+        incl_vweight = True
+        num_features_vweight = train_graphs[0].ndata['features_vweight'].size()[1]
+        mean_features_vweight = np.zeros(num_features_vweight)
+        std_features_vweight = np.zeros(num_features_vweight)
     if 'features_errors' in train_graphs[0].ndata.keys():
         incl_errors = True
         num_features_errors = train_graphs[0].ndata['features_errors'].size()[1]
@@ -53,11 +58,15 @@ def main(argv):
     for graph in train_graphs:
         features_base = graph.ndata['features_base'].numpy()
         mean_features_base += np.sum(features_base,axis=0)
+        if incl_vweight:
+            features_vweight = graph.ndata['features_vweight'].numpy()
+            mean_features_vweight += np.sum(features_vweight,axis=0)
         if incl_hits:
             features_hits = graph.ndata['features_hits'].numpy()
             mean_features_hits += np.sum(features_hits,axis=0)
         total_tracks += graph.ndata['features_base'].size()[0]
     mean_features_base = mean_features_base/total_tracks
+    if incl_vweight: mean_features_vweight = mean_features_vweight/total_tracks
     if incl_hits: mean_features_hits = mean_features_hits/total_tracks
 
     print("Calculating STD of features")
@@ -65,10 +74,14 @@ def main(argv):
     for graph in train_graphs:
         features_base = graph.ndata['features_base'].numpy()
         std_features_base += np.sum(np.square(features_base-mean_features_base),axis=0)
+        if incl_vweight:
+            features_vweight = graph.ndata['features_vweight'].numpy()
+            std_features_vweight += np.sum(np.square(features_vweight-mean_features_vweight),axis=0)
         if incl_hits:
             features_hits = graph.ndata['features_hits'].numpy()
             std_features_hits += np.sum(np.square(features_hits-mean_features_hits),axis=0)
     std_features_base = np.sqrt(std_features_base/total_tracks)
+    if incl_vweight: std_features_vweight = np.sqrt(std_features_vweight/total_tracks)
     if incl_hits: std_features_hits = np.sqrt(std_features_hits/total_tracks)
 
     #manually set normalization parameters for special features (features that have a fixed range are set to vary from -1 to 1)
@@ -101,6 +114,10 @@ def main(argv):
     for i in range(len(mean_features_base)):
         normfile.write(str(mean_features_base[i])+'\n')
         normfile.write(str(std_features_base[i])+'\n')
+    if incl_vweight:
+        for i in range(len(mean_features_vweight)):
+            normfile.write(str(mean_features_vweight[i])+'\n')
+            normfile.write(str(std_features_vweight[i])+'\n')
     if incl_errors:
         for i in range(len(mean_features_errors)):
             normfile.write(str(mean_features_errors[i])+'\n')
@@ -121,6 +138,10 @@ def main(argv):
         features_base = graph.ndata['features_base'].numpy()
         normed_features_base = np.divide(features_base-mean_features_base, std_features_base)
         graph.ndata['features_base'] = th.from_numpy(normed_features_base)
+        if incl_vweight:
+            features_vweight = graph.ndata['features_vweight'].numpy()
+            normed_features_vweight = np.divide(features_vweight-mean_features_vweight, std_features_vweight)
+            graph.ndata['features_vweight'] = th.from_numpy(normed_features_vweight) 
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             normed_features_errors = np.divide(features_errors-mean_features_errors, std_features_errors)
@@ -141,6 +162,10 @@ def main(argv):
         features_base = graph.ndata['features_base'].numpy()
         normed_features_base = np.divide(features_base-mean_features_base, std_features_base)
         graph.ndata['features_base'] = th.from_numpy(normed_features_base)
+        if incl_vweight:
+            features_vweight = graph.ndata['features_vweight'].numpy()
+            normed_features_vweight = np.divide(features_vweight-mean_features_vweight, std_features_vweight)
+            graph.ndata['features_vweight'] = th.from_numpy(normed_features_vweight) 
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             normed_features_errors = np.divide(features_errors-mean_features_errors, std_features_errors)
@@ -161,6 +186,10 @@ def main(argv):
         features_base = graph.ndata['features_base'].numpy()
         normed_features_base = np.divide(features_base-mean_features_base, std_features_base)
         graph.ndata['features_base'] = th.from_numpy(normed_features_base)
+        if incl_vweight:
+            features_vweight = graph.ndata['features_vweight'].numpy()
+            normed_features_vweight = np.divide(features_vweight-mean_features_vweight, std_features_vweight)
+            graph.ndata['features_vweight'] = th.from_numpy(normed_features_vweight) 
         if incl_errors:
             features_errors = graph.ndata['features_errors'].numpy()
             normed_features_errors = np.divide(features_errors-mean_features_errors, std_features_errors)

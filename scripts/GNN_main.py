@@ -79,9 +79,13 @@ def main(argv):
 
     sample_graph = dgl.load_graphs(train_infile_name, [0])[0][0]
     #calculate number of features in graphs
-    incl_errors = incl_corr = incl_hits = False
+    incl_errors = incl_corr = incl_hits = incl_vweight = False
     nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
     in_features = nnfeatures_base
+    if 'features_vweight' in sample_graph.ndata.keys():
+        nnfeatures_vweight = sample_graph.ndata['features_vweight'].size()[1]
+        incl_vweight = True
+        in_features += nnfeatures_vweight
     if 'features_errors' in sample_graph.ndata.keys():
         nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
         incl_errors = True
@@ -99,9 +103,9 @@ def main(argv):
     truth_frac = 0
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
-        test_len = int(paramfile.readline())
-        val_len = int(paramfile.readline())
-        train_len = int(paramfile.readline())
+        train_len = int(float(paramfile.readline()))
+        val_len = int(float(paramfile.readline()))
+        test_len = int(float(paramfile.readline()))
         truth_frac = float(paramfile.readline())
         b_frac = float(paramfile.readline())
         c_frac = float(paramfile.readline())
@@ -187,6 +191,7 @@ def main(argv):
 
             #construct feature matrix
             features = batch.ndata['features_base']
+            if incl_vweight: features = th.cat((features, batch.ndata['features_vweight']),dim=1)
             if incl_errors: features = th.cat((features, batch.ndata['features_errors']),dim=1)
             if incl_hits: features = th.cat((features, batch.ndata['features_hits']),dim=1)
             if incl_corr: features = th.cat((features, batch.ndata['features_corr']),dim=1)
@@ -232,6 +237,7 @@ def main(argv):
 
             #construct feature matrix
             val_features = val_batch.ndata['features_base']
+            if incl_vweight: val_features = th.cat((val_features, val_batch.ndata['features_vweight']),dim=1)
             if incl_errors: val_features = th.cat((val_features, val_batch.ndata['features_errors']),dim=1)
             if incl_hits: val_features = th.cat((val_features, val_batch.ndata['features_hits']),dim=1)
             if incl_corr: val_features = th.cat((val_features, val_batch.ndata['features_corr']),dim=1)
@@ -305,6 +311,7 @@ def main(argv):
 
         #construct feature matrix
         test_features = test_batch.ndata['features_base']
+        if incl_vweight: test_features = th.cat((test_features, test_batch.ndata['features_vweight']),dim=1)
         if incl_errors: test_features = th.cat((test_features, test_batch.ndata['features_errors']),dim=1)
         if incl_hits: test_features = th.cat((test_features, test_batch.ndata['features_hits']),dim=1)
         if incl_corr: test_features = th.cat((test_features, test_batch.ndata['features_corr']),dim=1)
