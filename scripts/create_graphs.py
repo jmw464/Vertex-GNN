@@ -105,7 +105,6 @@ def main(argv):
         flavors = np.zeros((ntracks,1))
         bin_labels = np.zeros((nedges,1))
         mult_labels = np.zeros((nedges,1))
-        flavor_labels = np.zeros((nedges,1))
         reco_labels = np.zeros((ntracks,2)) #use of track in SV0, SV1
         passed_cuts = np.zeros((ntracks,1))
         
@@ -195,25 +194,18 @@ def main(argv):
                 if ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 1 and flavors[k] == 1: #matching direct ancestors for non secondaries (B to B)
                     bin_labels[counter:counter+2] = 1
                     mult_labels[counter:counter+2] = 1
-                    flavor_labels[counter:counter+2] = 1
                 elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 2 and flavors[k] == 2: #matching direct ancestors for non secondaries (prompt C to prompt C)
                     bin_labels[counter:counter+2] = 1
                     mult_labels[counter:counter+2] = 2
-                    flavor_labels[counter:counter+2] = 2
                 elif ancestors[k] == ancestors[j] and ancestors[k] > 0 and flavors[j] == 3 and flavors[k] == 3: #matching direct ancestors for non secondaries (B->C to B->C for same C)
                     bin_labels[counter:counter+2] = 1
                     mult_labels[counter:counter+2] = 1
-                    flavor_labels[counter:counter+2] = 3
                 elif second_ancestors[k] == second_ancestors[j] and second_ancestors[k] > 0: #matching second ancestors (B->C to B->C for different C)
                     bin_labels[counter:counter+2] = incl_btoc
                     mult_labels[counter:counter+2] = incl_btoc
-                    flavor_labels[counter:counter+2] = 3*incl_btoc
                 elif (second_ancestors[k] == ancestors[j] and ancestors[j] > 0) or (second_ancestors[j] == ancestors[k] and ancestors[k] > 0): #matching second ancestor and direct ancestor (B to B->C)
                     bin_labels[counter:counter+2] = incl_btoc
                     mult_labels[counter:counter+2] = incl_btoc
-                    flavor_labels[counter:counter+2] = 3*incl_btoc
-                elif ancestors[k] == ancestors[j] and ancestors[k] != 0: #matching all other direct ancestors (P to P, S to S)
-                    flavor_labels[counter:counter+2] = flavors[k]
 
                 counter += 2
 
@@ -231,7 +223,6 @@ def main(argv):
             g.ndata['passed_cuts'] = th.from_numpy(passed_cuts)
             g.edata['bin_labels'] = th.from_numpy(bin_labels)
             g.edata['mult_labels'] = th.from_numpy(mult_labels)
-            g.edata['flavor_labels'] = th.from_numpy(flavor_labels)
             g_list.append(g)
             ngraphs += 1
 

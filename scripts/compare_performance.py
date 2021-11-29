@@ -46,6 +46,7 @@ def main(argv):
     jet_pt_bound = options.jet_pt_bound
     jet_eta_bound = options.jet_eta_bound
     plot_roc = options.plot_roc
+    ntrk_bound = option.ntrk_bound
 
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
@@ -99,17 +100,18 @@ def main(argv):
         print("ERROR: Specified norm file not found")
         return 1
 
-    bin_edges = np.linspace(-0.05,1.05,12)
+    bin_edges_one = np.linspace(-0.05,1.05,12)
+    bin_edges_ntrk = np.linspace(-0.5,ntrk_bound+0.5,ntrk_bound+2)
 
-    sv1_corrp_hist = TH1D("SV1", "Fraction of tracks from true SV in predicted SV;Fraction of correct tracks;Fraction of jets",11,bin_edges)
-    sv1_fakep_hist = TH1D("SV1 ", "Fraction of tracks in predicted SV not found in true SV;Fraction of correct tracks;Fraction of jets",11,bin_edges)
-    gnn_corrp_hist = TH1D("GNN", "Fraction of tracks from true SV in predicted SV;Fraction of correct tracks;Fraction of jets",11,bin_edges)
-    gnn_fakep_hist = TH1D("GNN ", "Fraction of tracks in predicted SV not found in true SV;Fraction of correct tracks;Fraction of jets",11,bin_edges)
+    sv1_corrp_hist = TH1D("SV1", "Fraction of tracks from true SV in predicted SV;Fraction of correct tracks;Fraction of jets",11,bin_edges_one)
+    sv1_fakep_hist = TH1D("SV1 ", "Fraction of tracks in predicted SV not found in true SV;Fraction of correct tracks;Fraction of jets",11,bin_edges_one)
+    gnn_corrp_hist = TH1D("GNN", "Fraction of tracks from true SV in predicted SV;Fraction of correct tracks;Fraction of jets",11,bin_edges_one)
+    gnn_fakep_hist = TH1D("GNN ", "Fraction of tracks in predicted SV not found in true SV;Fraction of correct tracks;Fraction of jets",11,bin_edges_one)
 	
-    no_true_sv_hist_tot = TH1D("no_true_sv_tot", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
-    no_true_sv_hist_c = TH1D("no_true_sv_c", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
-    no_true_sv_hist_b = TH1D("no_true_sv_b", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
-    no_true_sv_hist_btoc = TH1D("no_true_sv_btoc", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges[0:7]*10)
+    no_true_sv_hist_tot = TH1D("no_true_sv_tot", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges_one[0:7]*10)
+    no_true_sv_hist_c = TH1D("no_true_sv_c", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges_one[0:7]*10)
+    no_true_sv_hist_b = TH1D("no_true_sv_b", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges_one[0:7]*10)
+    no_true_sv_hist_btoc = TH1D("no_true_sv_btoc", "Number of true secondary vertices per jet;Number of SV's;Number of jets",6,bin_edges_one[0:7]*10)
 
     sv1_pt_profile_corrp_c = TProfile("sv1_pt_corrp_c", "Fraction of tracks from true SV in predicted SV for c jets as a function of jet pT;pT [GeV];Fraction of correct tracks",20,jet_pt_bound[0],jet_pt_bound[1])
     gnn_pt_profile_corrp_c = TProfile("gnn_pt_corrp_c", "Fraction of tracks from true SV in predicted SV for c jets as a function of jet pT;pT [GeV];Fraction of correct tracks",20,jet_pt_bound[0],jet_pt_bound[1])
@@ -137,10 +139,10 @@ def main(argv):
     gnn_pt_profile_alg_eff_b = TProfile("gnn_pt_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_alg_eff_b = TProfile("sv1_eta_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_alg_eff_b = TProfile("gnn_eta_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    sv1_ntrk_profile_alg_eff_c = TProfile("sv1_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_alg_eff_c = TProfile("gnn_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    sv1_ntrk_profile_alg_eff_b = TProfile("sv1_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
-    gnn_ntrk_profile_alg_eff_b = TProfile("gnn_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",20,0,10)
+    sv1_ntrk_profile_alg_eff_c = TProfile("sv1_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    gnn_ntrk_profile_alg_eff_c = TProfile("gnn_ntrk_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    sv1_ntrk_profile_alg_eff_b = TProfile("sv1_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    gnn_ntrk_profile_alg_eff_b = TProfile("gnn_ntrk_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
     sv1_lxy_profile_alg_eff_c = TProfile("sv1_lxy_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
     gnn_lxy_profile_alg_eff_c = TProfile("gnn_lxy_alg_eff_c", "SV reconstruction algorithmic efficiency for c jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
     sv1_lxy_profile_alg_eff_b = TProfile("sv1_lxy_alg_eff_b", "SV reconstruction algorithmic efficiency for b jets as a function of Lxy;Lxy [mm];Efficiency",20,0,100)
@@ -154,10 +156,10 @@ def main(argv):
     gnn_pt_profile_phys_eff_b = TProfile("gnn_pt_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet pT;pT [GeV];Efficiency",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_phys_eff_b = TProfile("sv1_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
     gnn_eta_profile_phys_eff_b = TProfile("gnn_eta_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of jet eta;eta;Efficiency",20,jet_eta_bound[0],jet_eta_bound[1])
-    sv1_ntrk_profile_phys_eff_c = TProfile("sv1_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
-    gnn_ntrk_profile_phys_eff_c = TProfile("gnn_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
-    sv1_ntrk_profile_phys_eff_b = TProfile("sv1_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
-    gnn_ntrk_profile_phys_eff_b = TProfile("gnn_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",10,0,11)
+    sv1_ntrk_profile_phys_eff_c = TProfile("sv1_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    gnn_ntrk_profile_phys_eff_c = TProfile("gnn_ntrk_phys_eff_c", "SV reconstruction physics efficiency for c jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    sv1_ntrk_profile_phys_eff_b = TProfile("sv1_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
+    gnn_ntrk_profile_phys_eff_b = TProfile("gnn_ntrk_phys_eff_b", "SV reconstruction physics efficiency for b jets as a function of track number (post-cuts);Number of tracks;Efficiency",ntrk_bound+1,bin_edges_ntrk)
 
     sv1_pt_profile_alg_fr = TProfile("sv1_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
     gnn_pt_profile_alg_fr = TProfile("gnn_pt_alg_fr", "SV reconstruction algorithmic fake rate as a function of jet pT;pT [GeV];Fake rate",20,jet_pt_bound[0],jet_pt_bound[1])
@@ -197,14 +199,14 @@ def main(argv):
 
         for g in g_list:
             gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
-            true_vertices = find_vertices_bin(g, 'truth', score_threshold)
+            true_vertices = find_vertices_bin(g, 'truth', 1.0)
             sv1_vertex = np.argwhere(g.ndata['reco_labels'].cpu().numpy().astype(int)[:,1]).flatten()
             jet_flavor = g.ndata['graph_info'].cpu().numpy().astype(int)[0,0]
             ntrk = g.num_nodes()
             if sv1_vertex.size > 0: sv1_vertex = [sv1_vertex]
 
-            jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
-            jet_sv1_cm, sv1_vertex_metrics, sv1_vertex_assoc = compare_vertices(true_vertices, sv1_vertex)
+            jet_gnn_cm, gnn_vertex_metrics = compare_vertices(true_vertices, gnn_vertices)
+            jet_sv1_cm, sv1_vertex_metrics = compare_vertices(true_vertices, sv1_vertex)
             gnn_cm += jet_gnn_cm
             sv1_cm += jet_sv1_cm
 
@@ -217,22 +219,39 @@ def main(argv):
 
             no_true_sv_hist_tot.Fill(len(true_vertices))
 
-            #check false track associations for each vertex
-            for i in range(len(gnn_vertices)):
-                vertex = gnn_vertices[i]
-                true_vertex_assoc = np.where(gnn_vertex_assoc == i)[0]
+            #for each GNN reco vertex, fill category histograms for falsely associated tracks and metric histograms
+            gnn_true_vertex_assoc = associate_vertices(gnn_vertex_metrics, 'r')
+            for i, vertex in enumerate(gnn_vertices):
+                if gnn_true_vertex_assoc[i] > -1:
+                    hist_pc_list[1].Fill(gnn_vertex_metrics[gnn_true_vertex_assoc[i],i,1])
+                    hist_pf_list[1].Fill(gnn_vertex_metrics[gnn_true_vertex_assoc[i],i,2])
+                else:
+                    hist_pc_list[1].Fill(0)
+                    hist_pf_list[1].Fill(1)
+
                 for track in vertex:
-                    trk_label = g.ndata['node_info'][track,4]
-                    if not true_vertex_assoc: #vertex association not available - fake GNN vertex
+                    trk_label = g.ndata['node_info'][track,4].numpy()
+                    if gnn_true_vertex_assoc[i] == -1: #vertex association not available - fake GNN vertex
                         gnn_trk_assoc_hist_fake.Fill(trk_label)
-                    elif track not in true_vertices[true_vertex_assoc[0]]:
+                    elif track not in true_vertices[gnn_true_vertex_assoc[i]]:
                         gnn_trk_assoc_hist_true.Fill(trk_label)
 
-            no_b = no_c = 0
-            for i in range(len(true_vertices)):
-                true_vertex = true_vertices[i]
-                edge_id = g.edge_id(true_vertex[0],true_vertex[1])
+            #for each SV1 reco vertex, fill category histograms for falsely associated tracks and metric histograms
+            sv1_true_vertex_assoc = associate_vertices(sv1_vertex_metrics, 'r')
+            for i, vertex in enumerate(sv1_vertex):
+                if sv1_true_vertex_assoc[i] > -1:
+                    hist_pc_list[0].Fill(sv1_vertex_metrics[sv1_true_vertex_assoc[i],i,1])
+                    hist_pf_list[0].Fill(sv1_vertex_metrics[sv1_true_vertex_assoc[i],i,2])
+                else:
+                    hist_pc_list[0].Fill(0)
+                    hist_pf_list[0].Fill(1)
 
+            no_b = no_c = 0
+            #for each true vertex, fill efficiency/fake rate histograms for best matching GNN/SV1 vertex
+            true_gnn_vertex_assoc = associate_vertices(gnn_vertex_metrics, 't')
+            true_sv1_vertex_assoc = associate_vertices(sv1_vertex_metrics, 't')
+            for i, true_vertex in enumerate(true_vertices):
+                edge_id = g.edge_id(true_vertex[0],true_vertex[1])
                 sv_coord = np.array([g.ndata['node_info'][true_vertex[0],5], g.ndata['node_info'][true_vertex[0],6], g.ndata['node_info'][true_vertex[0],7]])
                 Lxy = np.linalg.norm(pv_coord-sv_coord)
                 vertex_flavor = g.edata['mult_labels'][edge_id]
@@ -240,32 +259,30 @@ def main(argv):
                     no_b += 1
                 elif vertex_flavor == 2:
                     no_c += 1
-                                    
-                if gnn_vertex_assoc[i] >= 0:
-                    index = gnn_vertex_assoc[i]
-                    if vertex_flavor == 2:
-                        gnn_pt_profile_corrp_c.Fill(jet_pt, gnn_vertex_metrics[index][0])
-                        gnn_pt_profile_fakep_c.Fill(jet_pt, gnn_vertex_metrics[index][1])
-                        gnn_eta_profile_corrp_c.Fill(jet_eta, gnn_vertex_metrics[index][0])
-                        gnn_eta_profile_fakep_c.Fill(jet_eta, gnn_vertex_metrics[index][1])
-                    elif vertex_flavor == 1:
-                        gnn_pt_profile_corrp_b.Fill(jet_pt, gnn_vertex_metrics[index][0])
-                        gnn_pt_profile_fakep_b.Fill(jet_pt, gnn_vertex_metrics[index][1])
-                        gnn_eta_profile_corrp_b.Fill(jet_eta, gnn_vertex_metrics[index][0])
-                        gnn_eta_profile_fakep_b.Fill(jet_eta, gnn_vertex_metrics[index][1])
 
-                if sv1_vertex_assoc[i] >= 0:
-                    index = sv1_vertex_assoc[i]
+                if true_gnn_vertex_assoc[i] > -1:
                     if vertex_flavor == 2:
-                        sv1_pt_profile_corrp_c.Fill(jet_pt, sv1_vertex_metrics[index][0])
-                        sv1_pt_profile_fakep_c.Fill(jet_pt, sv1_vertex_metrics[index][1])
-                        sv1_eta_profile_corrp_c.Fill(jet_eta, sv1_vertex_metrics[index][0])
-                        sv1_eta_profile_fakep_c.Fill(jet_eta, sv1_vertex_metrics[index][1]) 
+                        gnn_pt_profile_corrp_c.Fill(jet_pt, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],1])
+                        gnn_pt_profile_fakep_c.Fill(jet_pt, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],2])
+                        gnn_eta_profile_corrp_c.Fill(jet_eta, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],1])
+                        gnn_eta_profile_fakep_c.Fill(jet_eta, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],2])
                     elif vertex_flavor == 1:
-                        sv1_pt_profile_corrp_b.Fill(jet_pt, sv1_vertex_metrics[index][0])
-                        sv1_pt_profile_fakep_b.Fill(jet_pt, sv1_vertex_metrics[index][1])
-                        sv1_eta_profile_corrp_b.Fill(jet_eta, sv1_vertex_metrics[index][0])
-                        sv1_eta_profile_fakep_b.Fill(jet_eta, sv1_vertex_metrics[index][1]) 
+                        gnn_pt_profile_corrp_b.Fill(jet_pt, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],1])
+                        gnn_pt_profile_fakep_b.Fill(jet_pt, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],2])
+                        gnn_eta_profile_corrp_b.Fill(jet_eta, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],1])
+                        gnn_eta_profile_fakep_b.Fill(jet_eta, gnn_vertex_metrics[i,true_gnn_vertex_assoc[i],2])
+
+                if true_sv1_vertex_assoc[i] > -1:
+                    if vertex_flavor == 2:
+                        sv1_pt_profile_corrp_c.Fill(jet_pt, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],1])
+                        sv1_pt_profile_fakep_c.Fill(jet_pt, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],2])
+                        sv1_eta_profile_corrp_c.Fill(jet_eta, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],1])
+                        sv1_eta_profile_fakep_c.Fill(jet_eta, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],2])
+                    elif vertex_flavor == 1:
+                        sv1_pt_profile_corrp_b.Fill(jet_pt, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],1])
+                        sv1_pt_profile_fakep_b.Fill(jet_pt, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],2])
+                        sv1_eta_profile_corrp_b.Fill(jet_eta, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],1])
+                        sv1_eta_profile_fakep_b.Fill(jet_eta, sv1_vertex_metrics[i,true_sv1_vertex_assoc[i],2])
 
             if no_b > 0: no_true_sv_hist_b.Fill(no_b)
             if no_c > 0: no_true_sv_hist_c.Fill(no_c)
@@ -341,14 +358,6 @@ def main(argv):
                 fake_found_gnn_phys += float(jet_flavor == 0)
                 gnn_pt_profile_phys_fr.Fill(jet_pt, float(jet_flavor == 0))
                 gnn_eta_profile_phys_fr.Fill(jet_eta, float(jet_flavor == 0))
-
-            for vertex_metric in gnn_vertex_metrics:
-                hist_pc_list[1].Fill(vertex_metric[0])
-                hist_pf_list[1].Fill(vertex_metric[1])
-
-            for vertex_metric in sv1_vertex_metrics:
-                hist_pc_list[0].Fill(vertex_metric[0])
-                hist_pf_list[0].Fill(vertex_metric[1])
 
     print('Secondary Vertex prediction results per jet (GNN/SV1):')
     print('             ||  Pred no SV   |   Pred 1 SV   |   Pred >1 SV  |')
@@ -430,12 +439,11 @@ def main(argv):
                 for g in g_list:
                     jet_flavor = g.ndata['graph_info'].cpu().numpy().astype(int)[0,0]
                     gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
-                    true_vertices = find_vertices_bin(g, 'truth', score_threshold)
-                    jet_gnn_cm, gnn_vertex_metrics, gnn_vertex_assoc = compare_vertices(true_vertices, gnn_vertices)
+                    true_vertices = find_vertices_bin(g, 'truth', 1.0)
+                    jet_gnn_cm, gnn_vertex_metrics = compare_vertices(true_vertices, gnn_vertices)
 
                     no_b = no_c = 0
-                    for i in range(len(true_vertices)):
-                        true_vertex = true_vertices[i]
+                    for i, true_vertex in enumerate(true_vertices):
                         edge_id = g.edge_id(true_vertex[0],true_vertex[1])
                         vertex_flavor = g.edata['mult_labels'][edge_id]
                         if vertex_flavor == 1:

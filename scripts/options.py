@@ -32,7 +32,7 @@ incl_hits = True #include GNN features related to low-level hit information
 incl_vweight = True #include vertex weight as GNN feature
 
 #neural network options - GNN
-load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
+load_checkpoint = True #toggle whether to load previous neural network checkpoint (continue training from previous point)
 valp = 0.2 #fraction of data reserved for validation
 testp = 0.1 #fraction of data reserved for testing
 
@@ -64,5 +64,6 @@ plot_roc = True #plotting ROC curve significantly increases computation time for
 track_pt_bound = [track_pt_cut/1000,10]
 track_d0_bound = [-25, 25]
 track_z0_bound = [-track_z0_cut, track_z0_cut]
+ntrk_bound = 20 #upper bound on number of tracks in plots
 jet_pt_bound = [jet_pt_cut/1000,200] #boundary jet pT [GeV] for plots
 jet_eta_bound = [-2.5,2.5] #boundary jet eta for plots

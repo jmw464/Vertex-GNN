@@ -6,7 +6,7 @@ DATANAME=btag_zh06_tt06_cut_v6
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
-ENTRIES=( 150 150 ) #jets used per file (after cuts)
+ENTRIES=( 150000 150000 ) #jets used per file (after cuts)
 
 NORMED=1
 

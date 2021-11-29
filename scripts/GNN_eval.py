@@ -68,6 +68,9 @@ def find_vertices_bin(graph, mode, score_threshold):
     ntracks = graph.number_of_nodes()
     edges = graph.all_edges()
     um_tracks = np.array(range(ntracks))
+    um_senders = np.zeros(int(ntracks*(ntracks-1)/2), dtype=int)
+    um_receivers = np.zeros(int(ntracks*(ntracks-1)/2), dtype=int)
+    um_labels = np.zeros(int(ntracks*(ntracks-1)/2))
 
     if mode == 'truth':
         labels = graph.edata['bin_labels'].cpu().detach().numpy().flatten()
@@ -77,12 +80,16 @@ def find_vertices_bin(graph, mode, score_threshold):
     vertices = []
 
     #average out forward and backward edges
-    for i in range(ntracks*(ntracks-1)-1):
-        labels[i] += labels[i+1]
-        labels[i] = labels[i]/2.
-    um_labels = labels[::2] #these arrays only contain values of unmatched edges
-    um_senders = edges[0].numpy()[::2]
-    um_receivers = edges[1].numpy()[::2]
+    count_index = 0
+    for i in range(ntracks):
+        for j in range(ntracks):
+            if i < j:
+                um_senders[count_index] = i
+                um_receivers[count_index] = j
+                edge_index_f = np.argwhere(np.logical_and(edges[0].numpy() == i, edges[1].numpy() == j))
+                edge_index_b = np.argwhere(np.logical_and(edges[0].numpy() == j, edges[1].numpy() == i))
+                um_labels[count_index] = (labels[edge_index_b]+labels[edge_index_f])/2
+                count_index += 1
 
     #outer loop ensures multiple vertices can be created
     while um_labels.size != 0:
@@ -138,49 +145,51 @@ def find_vertices_bin(graph, mode, score_threshold):
 def compare_vertices(true_vertices, reco_vertices):
 
     vertex_cm = np.zeros((3,3), dtype=int) #no sv, one sv, more than one sv (first index = true, second index = predicted)
-    vertex_metrics = [[0,1] for i in range(len(reco_vertices))] #############
-    vertex_assoc = np.empty(len(true_vertices), dtype=int) #index is true vertex, entry is reco vertex
-    vertex_assoc.fill(-1) #true vertices with -1 have no reco association
+    vertex_metrics = np.zeros((len(true_vertices),len(reco_vertices),3)) #array containing number of common tracks, efficiency and fake rate for each true/reco vertex combo
+    vertex_metrics[:,:,2].fill(1) #set initial fake rate to 1
 
     #count how many jets were correctly identified as containing an SV
-    if len(true_vertices) == 0:
-        if len(reco_vertices) == 0: vertex_cm[0,0] = 1
-        elif len(reco_vertices) == 1: vertex_cm[0,1] = 1
-        else: vertex_cm[0,2] = 1
-    elif len(true_vertices) == 1:
-        if len(reco_vertices) == 0: vertex_cm[1,0] = 1
-        elif len(reco_vertices) == 1: vertex_cm[1,1] = 1
-        else: vertex_cm[1,2] = 1
-    else:
-        if len(reco_vertices) == 0: vertex_cm[2,0] = 1
-        elif len(reco_vertices) == 1: vertex_cm[2,1] = 1
-        else: vertex_cm[2,2] = 1
+    true_index = min(2,len(true_vertices))
+    reco_index = min(2,len(reco_vertices))
+    vertex_cm[true_index, reco_index] = 1
 
-    #associate reco vertices with truth vertices based on which reco and truth vertices have the most tracks in common
-    assoc_true = [] #store true vertices that have already been associated
-    assoc_reco = [] #store reco vertices that have already been associated
-
-    for i in range(min(len(true_vertices), len(reco_vertices))):
-        maximum_pair = [-1,-1]
-        maximum_value = -1
-        for j in range(len(true_vertices)):
-            for k in range(len(reco_vertices)):
-                matching_tracks = np.intersect1d(reco_vertices[k], true_vertices[j]).size
-                if matching_tracks > maximum_value and j not in assoc_true and k not in assoc_reco:
-                    maximum_pair = [j,k]
-                    maximum_value = matching_tracks
-        vertex_assoc[maximum_pair[0]] = maximum_pair[1]
-        assoc_true.append(j)
-        assoc_reco.append(k)
-
-    #check what percentage of tracks were associated correctly in correctly identified SV's
+    #calculate efficiency, fake rate for each vertex combo
     for i in range(len(true_vertices)):
-        if vertex_assoc[i] != -1 and len(reco_vertices) > 0:
-            reco_index = int(vertex_assoc[i])
-            correct_tracks = np.intersect1d(reco_vertices[reco_index], true_vertices[i])
-            vertex_metrics[reco_index] = [correct_tracks.size/true_vertices[i].size, (reco_vertices[reco_index].size-correct_tracks.size)/reco_vertices[reco_index].size]
+        for j in range(len(reco_vertices)):
+            matching_tracks = np.intersect1d(true_vertices[i], reco_vertices[j]).size
+            vertex_eff = matching_tracks/true_vertices[i].size
+            vertex_fr = (reco_vertices[j].size-matching_tracks)/reco_vertices[j].size
+            vertex_metrics[i,j] = [matching_tracks, vertex_eff, vertex_fr]
+    
+    return vertex_cm, vertex_metrics
 
-    return vertex_cm, vertex_metrics, vertex_assoc
+
+#turn vertex metrics into direct associations between truth and reco vertices - mode = 't' (associate each truth to a reco vertex) or 'r' (associate each reco vertex to a truth vertex)
+def associate_vertices(vertex_metrics, mode):
+    if mode == 'r':
+        vertex_assoc_array = np.zeros(vertex_metrics.shape[1],dtype=int)
+        vertex_assoc_array.fill(-1)
+        if vertex_metrics.size > 0:
+            for i in range(vertex_metrics.shape[1]):
+                vertex_assoc = np.argwhere(np.logical_and(vertex_metrics[:,i,0] == np.amax(vertex_metrics[:,i,0]), vertex_metrics[:,i,0] > 0)).flatten()
+                if vertex_assoc.size > 1: vertex_assoc = np.argmax(vertex_metrics[vertex_assoc,i,1])
+                if vertex_assoc.size > 1: vertex_assoc = np.argmin(vertex_metrics[vertex_assoc,i,2])
+                if vertex_assoc.size > 1: vertex_assoc = vertex_assoc[0]
+                if vertex_assoc.size > 0: vertex_assoc_array[i] = vertex_assoc
+    elif mode == 't':
+        vertex_assoc_array = np.zeros(vertex_metrics.shape[0],dtype=int)
+        vertex_assoc_array.fill(-1)
+        if vertex_metrics.size > 0:
+            for i in range(vertex_metrics.shape[0]):
+                vertex_assoc = np.argwhere(np.logical_and(vertex_metrics[i,:,0] == np.amax(vertex_metrics[i,:,0]), vertex_metrics[i,:,0] > 0)).flatten()
+                if vertex_assoc.size > 1: vertex_assoc = np.argmax(vertex_metrics[i,vertex_assoc,1])
+                if vertex_assoc.size > 1: vertex_assoc = np.argmin(vertex_metrics[i,vertex_assoc,2])
+                if vertex_assoc.size > 1: vertex_assoc = vertex_assoc[0]
+                if vertex_assoc.size > 0: vertex_assoc_array[i] = vertex_assoc
+    else:
+        print("INVALID MODE SELECTION")
+
+    return vertex_assoc_array
 
 
 def print_output(multi_class, cm):

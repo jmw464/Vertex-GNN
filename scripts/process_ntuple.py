@@ -301,6 +301,7 @@ def main(argv):
                         t_flavor.append(6)
                     elif flavor == 'nm':
                         t_flavor.append(0)
+                        if track_dict[ti].hf_ancestor != 0: print(track_dict[ti].hf_ancestor)
 
                     t_ancestor.append(track_dict[ti].hf_ancestor)
                     t_ancestor_pdgid.append(ancestor_pdgid)
