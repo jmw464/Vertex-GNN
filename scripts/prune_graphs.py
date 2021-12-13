@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+
+####################################### prune_graphs.py #######################################
+# PURPOSE: cut marked tracks from test/train/val graph files
+# EDIT TO: update definition of edge labels (if modified in create_graphs)
+# -------------------------------------------Summary-------------------------------------------
+# This script is run as the final step in the processing chain and it requires DGL graph files
+# split into test/train/val dataset as input. These can come either directly from
+# "combine_graphs.py" or from "norm_graphs.py" if the features were normalized. The purpose of
+# this script is to remove tracks marked to be cut from all graphs in each dataset. Because
+# jet-level cuts are performed when the graphs are initially created, this script does not
+# change the number of graphs in each file (jets with fewer than 2 passing tracks are also
+# removed beforehand). Additionally, this script outputs a "paramfile" containing information
+# about the relative prevalence of each type of edge label in the training dataset, allowing
+# the GNN to re-weight labels during training.
+###############################################################################################
+
+
 import dgl
 import torch as th
 import os,sys,math,glob,random,ROOT

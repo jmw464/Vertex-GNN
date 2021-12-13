@@ -1,3 +1,18 @@
+#!/usr/bin/env python
+
+###################################### combine_graphs.py ######################################
+# PURPOSE: combine different DGL graph files into one, split data into test/train/val
+# EDIT TO: /
+# -------------------------------------------Summary-------------------------------------------
+# This script is run on binary graph files created with "create_graphs.py". Its purpose is
+# two-fold: combining multiple different graph files into a single GNN dataset (such as when
+# more than one ntuple is required) as well as splitting the combined dataset into testing,
+# training and validation data. The reason this is done at this stage is that all data must be
+# normalized only with respect to the training feature distributions. This script is written
+# to be very general, there should be no reason to edit it.
+###############################################################################################
+
+
 import dgl
 import torch as th
 import os,sys,math,glob,random,ROOT
@@ -33,20 +48,12 @@ def main(argv):
 
     g_list = []
     ngraphs = 0
-    total_cut = total_remain = 0
-
     for ntuple in ntuples:
-        infile_name = data_path+ntuple+".bin"
-        graphs = dgl.load_graphs(infile_name)[0]
-        ngraphs += len(graphs)
-
-        #add file number to graphs
-        for graph in graphs:
-            ntracks = graph.num_nodes()
-            total_cut += int(th.sum(graph.ndata['passed_cuts'] == 0))
-            total_remain += int(th.sum(graph.ndata['passed_cuts'] == 1))
-        
-            g_list.append(graph)
+        infile_names = glob.glob(data_path+ntuple+"_*.bin")
+        for infile_name in infile_names:
+            graphs = dgl.load_graphs(infile_name)[0]
+            g_list.extend(graphs)
+            ngraphs += len(graphs)
 
     random.shuffle(g_list)
 
@@ -54,8 +61,6 @@ def main(argv):
     test_len = int(round(testp*ngraphs))
     val_len = int(round(valp*ngraphs))
     train_len = int(ngraphs - (test_len + val_len))
-
-    print("Cut {}% of {} tracks".format(100*total_cut/(total_cut+total_remain), total_cut+total_remain))
 
     #split g_list
     test_list = g_list[:test_len]
@@ -66,6 +71,7 @@ def main(argv):
     dgl.save_graphs(test_outfile_name, test_list)
     dgl.save_graphs(val_outfile_name, val_list)
     dgl.save_graphs(train_outfile_name, train_list)
+
 
 if __name__ == '__main__':
     main(sys.argv)

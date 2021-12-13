@@ -1,27 +1,41 @@
 #!/usr/bin/env python
 
-#GNN for secondary vertex reconstructions
+######################################### GNN_main.py #########################################
+# PURPOSE: trains GNN for secondary vertex reconstructions
+# EDIT TO: implement new GNN tools, update graph structure (if modified in create_graphs)
+# ------------------------------------------Summary-------------------------------------------
+# This script serves as the center of this framework and runs the GNN training. It can be run
+# in both binary classification mode (edges are "connected" and "not connected") or multi-label
+# classification mode (edges are "connected via b SV", "connected via c SV" and
+# "not connected"). It will output a results file containing the same graphs as the testing
+# dataset, but with GNN predictions included. Many of the pre-implemented features can be
+# activated/deactivated in the options script (i.e. LR schedules, label reweighting, etc.).
+# There is no need to modify this script unless the graph structure itself is modified in the
+# processing scripts or to implement new GNN tools or modify existing ones (such as the LR
+# schedule).
+###############################################################################################
+
+
+import dgl
+import torch as th
+import torch.nn as nn
+
+import os,sys,math,glob,time
+import numpy as np
+import argparse
+import ROOT
+from ROOT import gROOT, TFile, TH1D
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 from GNN_model import *
 from GNN_eval import *
 from plot_functions import *
 import options
 
-import matplotlib as mpl
-mpl.use('Agg')
-
-import dgl
-import torch as th
-import torch.nn as nn
-import os,sys,math,glob,time
-import numpy as np
-import argparse
-import ROOT
-from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile
-import matplotlib.pyplot as plt
-
 #th.set_printoptions(edgeitems=10000)
 #np.set_printoptions(threshold=sys.maxsize)
+mpl.use('Agg')
 
 
 def main(argv):
@@ -56,14 +70,11 @@ def main(argv):
     reweight = options.reweight #reweight positive labels in loss to make positives and negatives equally important
     load_checkpoint = options.load_checkpoint
     use_lr_scheduler = options.use_lr_scheduler
-    mult_threshold = options.mult_threshold
-    bin_threshold = options.bin_threshold
-    score_threshold = options.score_threshold
 
-    #-------------------------------------------------PRE-PROCESSING------------------------------------------------
+    #---------------------------------------------------DATA-IMPORT-------------------------------------------------
 
-    print("Importing input data.")
     start_time = time.time()
+    print("Importing input data.")
     
     #set relevant filenames
     if use_normed:
@@ -74,11 +85,10 @@ def main(argv):
     train_infile_name = infile_path+infile_name+"_train"+ext+".bin"
     val_infile_name = infile_path+infile_name+"_val"+ext+".bin"
     test_infile_name = infile_path+infile_name+"_test"+ext+".bin"
-    registerfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_register"
     checkpointfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_model.pt"
 
-    sample_graph = dgl.load_graphs(train_infile_name, [0])[0][0]
     #calculate number of features in graphs
+    sample_graph = dgl.load_graphs(train_infile_name, [0])[0][0]
     incl_errors = incl_corr = incl_hits = incl_vweight = False
     nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
     in_features = nnfeatures_base
@@ -100,7 +110,6 @@ def main(argv):
         in_features += nnfeatures_corr
     
     #read in values from parameter file
-    truth_frac = 0
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
         train_len = int(float(paramfile.readline()))
@@ -117,7 +126,7 @@ def main(argv):
     print("Finished importing input data. Time elapsed: {}s.\n".format(p_time))
 
     #reweight positive labels automatically if desired
-    if reweight and truth_frac:
+    if reweight:
         pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
         mult_weights = th.tensor([1./(1-b_frac-c_frac), 1./b_frac, 1./c_frac])
         print("Setting positive weight to {}".format(pos_weight))
@@ -132,6 +141,7 @@ def main(argv):
 
     device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
 
+    #set up loss
     if not multi_class:
         loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
         outfeats = 1
@@ -265,35 +275,7 @@ def main(argv):
 
     print("Training finished. Evaluating model.\n")
 
-    #---------------------------------------------------EVALUATION--------------------------------------------------
-
-    #create and group histograms
-    registerfile = open(registerfile_name, "w")
-    bin_edges = np.linspace(-0.05,1.05,12)
-    if not multi_class:
-        pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Fraction of jets",11,bin_edges) #1.001 is the upper bound so this is inclusive of 1
-        neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
-        edge_score_hist = TH1D("", "Edges scores;Score;Fraction of jets",11,bin_edges)
-
-        hist_r_list = [neg_r_hist, pos_r_hist]
-        hist_s_list = [edge_score_hist]
-
-    else:
-        neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
-        b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
-        c_r_hist = TH1D("Class 2 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
-        btoc_r_hist = TH1D("Class 3 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
-        o_r_hist = TH1D("Class 4 recall", "Results for each jet;Rate;Fraction of jets",10,bin_edges)
-        neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
-        b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
-        c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Fraction of jets",10,bin_edges)
-
-        hist_r_list = [neg_r_hist, b_r_hist, c_r_hist, btoc_r_hist, o_r_hist]
-        hist_s_list = [neg_score_hist, b_score_hist, c_score_hist]
-
-    #initialize overall bad events matrix
-    bad_events = np.empty((0,3), dtype=np.int)
-    total_bad = total_jets = 0
+    #---------------------------------------------------EVALUATION-------------------------------------------------- 
 
     overall_g_list = []
 
@@ -323,40 +305,17 @@ def main(argv):
         
         #evaluate results
         pred = activation(model(test_batch, test_features).float()).cpu().detach().numpy()
-        true = test_batch.edata[labeltype].cpu().numpy().astype(int)
-
-        #fill edge score histograms
-        if not multi_class:
-            for i in range(pred.shape[0]):
-                edge_score_hist.Fill(pred[i,0])
-            pred = pred.round().astype(int)
-        else:
-            for i in range(pred.shape[0]):
-                neg_score_hist.Fill(pred[i,0])
-                b_score_hist.Fill(pred[i,1])
-                c_score_hist.Fill(pred[i,2])
-            pred = np.argmax(pred, axis=1).astype(int)
+        true = test_batch.edata[labeltype].cpu().numpy().astype(int) 
         
         test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
         g_test_list = dgl.unbatch(test_batch)
-
-        #evaluate bad events and find secondary vertices
-        total_bad = 0
-        for g in g_test_list:
-            if is_bad_jet(g, hist_r_list, multi_class, bin_threshold, mult_threshold):
-                total_bad += 1
-                g.ndata['bad'] = th.from_numpy(np.ones((g.number_of_nodes(),1)))
-            else:
-                g.ndata['bad'] = th.from_numpy(np.zeros((g.number_of_nodes(),1))) 
-
-        total_jets += len(g_test_list)
         overall_g_list.extend(g_test_list)
 
         if not multi_class:
-            cm += evaluate_confusion_bin(true, pred)
+            cm += evaluate_confusion_bin(true, pred.round().astype(int))
         else:
-            cm += evaluate_confusion_mult(true, pred)
+            cm += evaluate_confusion_mult(true, pred.round().astype(int))
 
     #print test results
     print_output(multi_class, cm)
@@ -372,11 +331,6 @@ def main(argv):
     plt.legend()
     plt.xlabel("Epoch")
     plt.savefig(outfile_name+"_lossplot.png")
-
-    ext = ["_recall.png", "_score.png"]
-    hist_list_list = [hist_r_list, hist_s_list]
-    for i in range(len(hist_list_list)):
-        plot_metric_hist(hist_list_list[i], [0.0,1.2], outfile_name+ext[i])
 
 
 if __name__ == '__main__':

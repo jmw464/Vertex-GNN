@@ -1,12 +1,18 @@
-import dgl
-import torch as th
-import torch.nn as nn
-import os,sys,math,glob,time
+#!/usr/bin/env python
+
+######################################### GNN_eval.py #########################################
+# PURPOSE: contains helper functions related to GNN evaluation
+# EDIT TO: change definition of "badly reconstructed" jet
+# ------------------------------------------Summary--------------------------------------------
+# This script contains a collection of functions used throughout the evaluation of GNN
+# performance and comparisons to SV1 (used in GNN_main, plot_results and compare_performance).
+###############################################################################################
+
+
 import numpy as np
-import argparse
+import torch as th
 import ROOT
-from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas
-import matplotlib.pyplot as plt
+import dgl
 
 
 #evaluate confusion matrix for binary case
@@ -32,7 +38,7 @@ def evaluate_confusion_mult(true, pred):
     return cm
 
 
-#get list of events GNN performs poorly on
+#check if GNN performed poorly on event
 def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
 
     #store recall for each class
@@ -48,7 +54,7 @@ def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
         true = graph.edata['mult_labels'].cpu().detach().numpy().astype(int)
         cm = evaluate_confusion_mult(true, pred)
         r_threshold = mult_threshold
-            
+
     #fill histograms and r_array to determine bad events
     for j in range(cm.shape[0]):
         if np.sum(cm[j,:]) != 0:
@@ -60,10 +66,11 @@ def is_bad_jet(graph, hist_list, multi_class, bin_threshold, mult_threshold):
     for j in range(cm.shape[0]):
         if r_array[j] < r_threshold[j] and r_array[j] >= 0:
             return True
-            
+
     return False
 
 
+#group tracks into vertices based on edge scores - truth mode generates truth SVs based on training target labels
 def find_vertices_bin(graph, mode, score_threshold):
     ntracks = graph.number_of_nodes()
     edges = graph.all_edges()
@@ -72,7 +79,7 @@ def find_vertices_bin(graph, mode, score_threshold):
     um_receivers = np.zeros(int(ntracks*(ntracks-1)/2), dtype=int)
     um_labels = np.zeros(int(ntracks*(ntracks-1)/2))
 
-    if mode == 'truth':
+    if mode == 'truth' or mode == 't':
         labels = graph.edata['bin_labels'].cpu().detach().numpy().flatten()
     else:
         labels = graph.edata['pred'].cpu().detach().numpy().flatten()
@@ -192,6 +199,7 @@ def associate_vertices(vertex_metrics, mode):
     return vertex_assoc_array
 
 
+#print confusion matrix and other GNN evaluation metrics
 def print_output(multi_class, cm):
     if not multi_class:
         print('\nTesting results:')

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #changeable parameters are values that can be changed here freely without having to edit the scripts
 #constant parameters are values that are more deeply integrated and require changes to be made to the scripts themselves
 
@@ -17,9 +19,9 @@ nefeatures = 0 #number of features per edge
 #########################
 
 #cuts on data - PROCESSING
-jet_pt_cut = 20000 #minimum required jet pT value (default: >20 GeV)
+jet_pt_cut = 20 #minimum required jet pT value (default: >20 GeV)
 jet_eta_cut = 2.5 #maximum allowed |jet eta| value (default <2.5)
-track_pt_cut = 650 #minimum required track pT value
+track_pt_cut = 0.65 #minimum required track pT value
 track_eta_cut = 2.5 #maximum allowed |track eta| value (default: <2.5)
 track_z0_cut = 20 #maximum allowed |track z0| value
 vweight_pileup_cut = 0.95 #maximum allowed vertex weight value (pileup vertex association)
@@ -32,7 +34,7 @@ incl_hits = True #include GNN features related to low-level hit information
 incl_vweight = True #include vertex weight as GNN feature
 
 #neural network options - GNN
-load_checkpoint = True #toggle whether to load previous neural network checkpoint (continue training from previous point)
+load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
 valp = 0.2 #fraction of data reserved for validation
 testp = 0.1 #fraction of data reserved for testing
 
@@ -56,14 +58,20 @@ use_lr_scheduler = False #toggle whether to use learning rate schedule during tr
 
 #truth definitions - PROCESSING, PLOTTING
 vertex_threshold = 0 #maximum distance for non HF tracks to be marked as part of the same vertex ("other" category)
-incl_btoc = True #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's or separate them based on their direct HF ancestors
+connect_btoc = True #toggle whether to combine tracks from b hadrons and all c hadrons in B->C SV's or separate them based on their direct HF ancestors
 
 #plotting options - PLOTTING
 use_atlas_style = False
 plot_roc = True #plotting ROC curve significantly increases computation time for compare_performance.py
-track_pt_bound = [track_pt_cut/1000,10]
-track_d0_bound = [-25, 25]
-track_z0_bound = [-track_z0_cut, track_z0_cut]
+track_pt_bound = [track_pt_cut,10] #lower bound needs to be > 0
+track_pt_err_bound = [10,1000] #lower bound needs to be > 0
+track_theta_err_bound = 0.01
+track_phi_err_bound = 0.01
+track_d0_bound = 25
+track_d0_err_bound = 1
+track_z0_bound = track_z0_cut
+track_z0_err_bound = 0.5
 ntrk_bound = 20 #upper bound on number of tracks in plots
-jet_pt_bound = [jet_pt_cut/1000,200] #boundary jet pT [GeV] for plots
-jet_eta_bound = [-2.5,2.5] #boundary jet eta for plots
+lxy_bound = 50
+jet_pt_bound = [jet_pt_cut,200] #boundary jet pT [GeV] for plots
+jet_eta_bound = 2.5 #boundary jet eta for plots

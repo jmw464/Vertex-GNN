@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os,sys,math,ROOT,glob
 import numpy as np
 import argparse
@@ -14,6 +16,7 @@ def plot_hist(histlist, labellist, norm, log, overflow, filename, options, scali
     histstack = THStack("stack",histlist[0].GetTitle())
     legend = TLegend(0.76,0.88-0.08*len(histlist),0.91,0.88,'','NDC')
     colorlist = [4,8,2,6,1]
+    if len(scaling) > 1 and scaling[1] == 0: scaling = []
 
     if options: options += " NOSTACK"
     else: options = "NOSTACK"

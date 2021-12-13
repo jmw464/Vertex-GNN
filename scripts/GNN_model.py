@@ -1,9 +1,20 @@
-import torch as th
-import torch.nn as nn
-import torch.nn.functional as F
+#!/usr/bin/env python
+
+######################################## GNN_model.py ########################################
+# PURPOSE: contains class definitions of GNN model
+# EDIT TO: change GNN model
+# ------------------------------------------Summary-------------------------------------------
+# This script contains all class definitions specifying the GNN model itself. As such, these
+# objects are only used in GNN_main. Tweaks to the model structure can be made here.
+##############################################################################################
+
+
 import dgl
 import dgl.nn as dglnn
 import dgl.function as fn
+import torch as th
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 class GCN(nn.Module):
@@ -74,11 +85,11 @@ class EdgeMLP(nn.Module):
 
 class DotProductPredictor(nn.Module):
     
-    def forward(self, graph, h):
-        with graph.local_scope():
-            graph.ndata['h'] = h
-            graph.apply_edges(fn.u_dot_v('h', 'h', 'score'))
-            return graph.edata['score']
+    def forward(self, g, h):
+        with g.local_scope():
+            g.ndata['h'] = h
+            g.apply_edges(fn.u_dot_v('h', 'h', 'score'))
+            return g.edata['score']
 
 
 class EdgePredModel(nn.Module):

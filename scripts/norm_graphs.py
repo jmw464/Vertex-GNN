@@ -1,3 +1,22 @@
+#!/usr/bin/env python
+
+###################################### norm_graphs.py ######################################
+# PURPOSE: normalize test/train/val DGL graph files
+# EDIT TO: modify how features are normalized, update graph structure (if modified in
+#          create_graphs)
+# -----------------------------------------Summary-----------------------------------------
+# This script is run after "combine_graph.py" and requires the testing, training and
+# and validation data to be split already. It normalizes features in each of these datasets,
+# usually by shifting the mean to 0 and scaling the STD to 1. The exception to this are
+# features with fixed bounds, which are normalized to be contained in the range [-1,1] as
+# well as the error and correlation features, which are scaled to match their corresponding
+# variables. In addition to normalized test/train/val DGL graph files, this script also
+# outputs a test file containing scaling information for each feature (so they can be
+# transformed back after network evaluation). Note that normalization is optional, so this
+# script can be skipped if desired.
+############################################################################################
+
+
 import dgl
 import torch as th
 import os,sys,math,glob,ROOT
