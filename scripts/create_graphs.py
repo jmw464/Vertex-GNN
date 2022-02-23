@@ -116,7 +116,7 @@ def main(argv):
         if passed_graphs >= max_graphs: break #stop reading in new files if maximum desired jet number is reached
 
         #check if outfile already exists and skip if it's newer than infile unless it's the last prevously processed file (in case more entries are being added)
-        if ifile != len(outfiles) and os.path.exists(outfiles[ifile+1]) and os.path.exists(outfiles[ifile]) and os.path.getmtime(outfiles[ifile]) > os.path.getmtime(infile_name):
+        if ifile+1 != len(outfiles) and os.path.exists(outfiles[ifile+1]) and os.path.exists(outfiles[ifile]) and os.path.getmtime(outfiles[ifile]) > os.path.getmtime(infile_name):
             print("Current version of "+os.path.basename(outfiles[ifile])+" already exists. Skipping file.")
             continue
 
@@ -233,7 +233,7 @@ def main(argv):
                     sv_z = infile['tinfo']['sv_z'][track_offset+j]
 
                     #make cuts on track level
-                    if ttv_avail: vertex_condition = (track_vweight < vweight_pv_cut and track_vtype == 1) or (track_vweight < vweight_pileup_cut and track_vtype == 2)
+                    if ttv_avail: vertex_condition = (track_vweight < vweight_pv_cut and track_vtype == 1) or (track_vweight < vweight_pileup_cut and track_vtype == 3) or track_vtype == 0
                     else: vertex_condition = True
                     if track_pt > track_pt_cut and abs(track_eta) < track_eta_cut and abs(track_z0) < track_z0_cut and vertex_condition:
                         passed_cuts[j] = 1
@@ -273,10 +273,10 @@ def main(argv):
                         elif hf_ancestors[k] == hf_ancestors[j] and hf_ancestors[k] > 0 and track_flavors[j] == 3 and track_flavors[k] == 3: #matching direct ancestors for non secondaries (B->C to B->C for same C)
                             bin_labels[counter:counter+2] = 1
                             mult_labels[counter:counter+2] = 1
-                        elif prev_b_ancestors[k] == prev_b_ancestors[j] and prev_b_ancestors[k] > 0: #matching second ancestors (B->C to B->C for different C)
+                        elif prev_b_ancestors[k] == prev_b_ancestors[j] and prev_b_ancestors[k] > 0 and track_flavors[j] == 3 and track_flavors[k] == 3: #matching second ancestors (B->C to B->C for different C)
                             bin_labels[counter:counter+2] = connect_btoc
                             mult_labels[counter:counter+2] = connect_btoc
-                        elif (prev_b_ancestors[k] == hf_ancestors[j] and hf_ancestors[j] > 0) or (prev_b_ancestors[j] == hf_ancestors[k] and hf_ancestors[k] > 0): #matching second ancestor and direct ancestor (B to B->C)
+                        elif ((prev_b_ancestors[k] == hf_ancestors[j] and hf_ancestors[j] > 0) or (prev_b_ancestors[j] == hf_ancestors[k] and hf_ancestors[k] > 0)) and ((track_flavors[j] == 1 and track_flavors[k] == 3) or (track_flavors[j] == 3 and track_flavors[k] == 1)): #matching second ancestor and direct ancestor (B to B->C)
                             bin_labels[counter:counter+2] = connect_btoc
                             mult_labels[counter:counter+2] = connect_btoc
                         counter += 2
@@ -317,11 +317,11 @@ def main(argv):
         #save graphs to file
         dgl.save_graphs(outfiles[ifile], g_list)
 
-    print("Found enough good jets to reach desired sample size. Finishing up...")
+    print("\nFound enough good jets to reach desired sample size. Finishing up...")
     print("--------------------------------------------------------------------")
 
     p_time = time.time()-start_time
-    print("\nGraphs cut due to jet requirements: {}".format(jet_req_cuts))
+    print("Graphs cut due to jet requirements: {}".format(jet_req_cuts))
     print("Graphs cut due to track requirements: {}".format(track_req_cuts))
     print("Fraction of tracks cut from passed jets: {}".format(tracks_cut/(tracks_cut+tracks_kept)))
     print("Finished creating graphs. Time elapsed: {}s.".format(p_time))

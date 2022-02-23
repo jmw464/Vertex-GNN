@@ -58,7 +58,7 @@ class truth_track():
 
     def print_track(self,level):
         prefix = "xx"*level + ">"
-        if self.classification: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}, Class: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0, self.classification))
+        if self.classification: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}, Class: {}, Anc: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0, self.classification, self.hf_ancestor))
         else: print("{} PDG ID: {}, Barcode: {}, Vertex: {}, d0: {}, z0: {}".format(prefix, self.pdgid, self.barcode, self.vertex, self.d0, self.z0)) 
 
 
@@ -121,7 +121,7 @@ def build_track_dict(entry, i, particle_dict, primary_vertex):
         track = track_dict[ti]
 
         #can only determine ancestors of tracks with matched truth particles
-        if track.pdgid > 0:
+        if track.pdgid != -999:
             t_barcode = track.barcode
             track_particle = particle_dict[t_barcode]
 
@@ -255,12 +255,12 @@ def print_tree(particle, particle_dict, track_dict, level): #level = 0 disables 
     pdgid = particle.pdgid
     condition = True #eg pdgid != 21 and pdgid != 22 OR (id_particle(pdgid) == 'ch') or (id_particle(pdgid) == 'bh') if only certain types of particles should be printed
 
-    #print information
-    if condition:
-        for ti in track_dict:
-            if barcode == track_dict[ti].barcode:
-                track_dict[ti].print_track(level)
-        particle.print_particle(level)
+    #print information - always print tracks
+    for ti in track_dict:
+        if barcode == track_dict[ti].barcode:
+            track_dict[ti].print_track(level)
+            particle.print_particle(level)
+    if condition: particle.print_particle(level)
 
     #loop through children recursively
     if level:

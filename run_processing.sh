@@ -1,8 +1,15 @@
 #!/bin/bash
+#SBATCH -n 12
+#SBATCH --qos=regular
+#SBATCH -C knl
+#SBATCH --time=19:59:00
+#SBATCH --error=proc_%j.err
+#SBATCH --output=proc_%j.out
+
 
 NTUPLES="user.jmwagner.27266826.Akt4EMPf_BTagging201903._000006 user.jmwagner.27266824.Akt4EMPf_BTagging201903._000006"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh06_tt06_cut_v6
+DATANAME=btag_zh06_tt06_cut_v6c
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
@@ -14,10 +21,6 @@ NORMED=1
 if [ ! -d ${DATADIR}${DATANAME}/ ]
 then
 	mkdir ${DATADIR}${DATANAME}/
-else
-	printf "WARNING: Data directory already exists and contents might be overwritten. Continue? (y/n)\n"
-	read YN
-	printf "\n"
 fi
 
 if [ "$YN" == "N" ] || [ "$YN" == "n" ]

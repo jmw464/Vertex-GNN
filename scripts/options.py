@@ -1,35 +1,23 @@
 #!/usr/bin/env python
 
-#changeable parameters are values that can be changed here freely without having to edit the scripts
-#constant parameters are values that are more deeply integrated and require changes to be made to the scripts themselves
-
-#######################
-# CONSTANT PARAMETERS #
-#######################
-
-#input data parameters - PROCESSING
-nnfeatures_base = 8 #number of core GNN features (track parameters)
-nnfeatures_errors = 5 #number of diagonal covariance matrix GNN features
-nnfeatures_corrs = 10 #number of off-diagonal covariance matrix GNN features
-nnfeatures_hits = 10 #number of GNN features related to low-level hit information
-nefeatures = 0 #number of features per edge
 
 #########################
 # CHANGEABLE PARAMETERS #
 #########################
 
+
 #cuts on data - PROCESSING
 jet_pt_cut = 20 #minimum required jet pT value (default: >20 GeV)
 jet_eta_cut = 2.5 #maximum allowed |jet eta| value (default <2.5)
-track_pt_cut = 0.65 #minimum required track pT value
-track_eta_cut = 2.5 #maximum allowed |track eta| value (default: <2.5)
-track_z0_cut = 20 #maximum allowed |track z0| value
+track_pt_cut = 0.65 #0.65 #minimum required track pT value
+track_eta_cut = 2.5 #2.5 #maximum allowed |track eta| value (default: <2.5)
+track_z0_cut = 20. #20 #maximum allowed |track z0| value
 vweight_pileup_cut = 0.95 #maximum allowed vertex weight value (pileup vertex association)
 vweight_pv_cut = 0.95 #maximum allowed vertex weight value (primary vertex association)
 
 #input data parameters - PROCESSING, GNN
 incl_errors = True #include diagonal covariance matrix GNN features
-incl_corr = False #include off-diagonal covariance matrix GNN features
+incl_corr = True #include off-diagonal covariance matrix GNN features
 incl_hits = True #include GNN features related to low-level hit information
 incl_vweight = True #include vertex weight as GNN feature
 

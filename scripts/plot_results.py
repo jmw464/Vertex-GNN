@@ -159,8 +159,10 @@ def main(argv):
         pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Fraction of jets",11,bin_edges) #1.001 is the upper bound so this is inclusive of 1
         neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
         edge_score_hist = TH1D("", "Edges scores;Score;Fraction of jets",11,bin_edges)
-        hist_r_list = [neg_r_hist, pos_r_hist]
+        hist_r_list = [neg_r_hist, pos_r_hist] #TNR, TPR
+        r_labels = ["TNR", "TPR"]
         hist_s_list = [edge_score_hist]
+        s_labels = []
     else:
         neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
         b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
@@ -169,7 +171,9 @@ def main(argv):
         b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Fraction of jets",11,bin_edges)
         c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Fraction of jets",11,bin_edges)
         hist_r_list = [neg_r_hist, b_r_hist, c_r_hist]
+        r_labels = ["negative recall", "b recall", "c recall"]
         hist_s_list = [neg_score_hist, b_score_hist, c_score_hist]
+        s_labels = ["negative score", "b score", "c score"]
 
     #read in normalization constants for features
     if os.path.isfile(normfile_name):
@@ -306,18 +310,19 @@ def main(argv):
 
     ext = ["_recall.png", "_score.png"]
     hist_list_list = [hist_r_list, hist_s_list]
+    label_list_list = [r_labels, s_labels]
     for i in range(len(hist_list_list)):
-        plot_metric_hist(hist_list_list[i], [0.0,1.4], base_filename+ext[i])
+        plot_hist(hist_list_list[i], label_list_list[i], False, False, False, base_filename+ext[i], "NOSTACK")
 
-    plot_hist_diff([hist_trk_pt_b_tot, hist_trk_pt_c_tot, hist_trk_pt_btoc_tot], [hist_trk_pt_b_bad, hist_trk_pt_c_bad, hist_trk_pt_btoc_bad], ["bH", "prompt cH", "bH->cH"], False, True, base_filename+"_trk_pt_comp.png", "HIST")
-    plot_hist_diff([hist_trk_theta_b_tot, hist_trk_theta_c_tot, hist_trk_theta_btoc_tot], [hist_trk_theta_b_bad, hist_trk_theta_c_bad, hist_trk_theta_btoc_bad], ["bH", "prompt cH", "bH->cH"], False, True, base_filename+"_trk_theta_comp.png", "HIST")
-    plot_hist_diff([hist_trk_phi_b_tot, hist_trk_phi_c_tot, hist_trk_phi_btoc_tot], [hist_trk_phi_b_bad, hist_trk_phi_c_bad, hist_trk_phi_btoc_bad], ["bH", "prompt cH", "bH->cH"], False, True, base_filename+"_trk_phi_comp.png", "HIST")
-    plot_hist_diff([hist_trk_d0_b_tot, hist_trk_d0_c_tot, hist_trk_d0_btoc_tot], [hist_trk_d0_b_bad, hist_trk_d0_c_bad, hist_trk_d0_btoc_bad], ["bH", "prompt cH", "bH->cH"], False, True, base_filename+"_trk_d0_comp.png", "HIST")
-    plot_hist_diff([hist_trk_z0_b_tot, hist_trk_z0_c_tot, hist_trk_z0_btoc_tot], [hist_trk_z0_b_bad, hist_trk_z0_c_bad, hist_trk_z0_btoc_bad], ["bH", "prompt cH", "bH->cH"], False, True, base_filename+"_trk_z0_comp.png", "HIST")
-    plot_hist([hist_no_trk_jet_b_tot, hist_no_trk_jet_c_tot, hist_no_trk_jet_btoc_tot, hist_no_trk_jet_nohf_tot, hist_no_trk_jet_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, False, True, base_filename+"_no_trk_tot.png", "HIST")
-    plot_hist([hist_frac_trk_b_tot, hist_frac_trk_c_tot, hist_frac_trk_btoc_tot, hist_frac_trk_nohf_tot, hist_frac_trk_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, False, True, base_filename+"_frac_trk_tot.png", "HIST")
-    plot_hist([hist_no_trk_jet_b_bad, hist_no_trk_jet_c_bad, hist_no_trk_jet_btoc_bad, hist_no_trk_jet_nohf_bad, hist_no_trk_jet_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, False, True, base_filename+"_no_trk_bad.png", "HIST")
-    plot_hist([hist_frac_trk_b_bad, hist_frac_trk_c_bad, hist_frac_trk_btoc_bad, hist_frac_trk_nohf_bad, hist_frac_trk_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, False, True, base_filename+"_frac_trk_bad.png", "HIST") 
+    plot_hist_diff([hist_trk_pt_b_tot, hist_trk_pt_c_tot, hist_trk_pt_btoc_tot], [hist_trk_pt_b_bad, hist_trk_pt_c_bad, hist_trk_pt_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_pt_comp.png", "HIST")
+    plot_hist_diff([hist_trk_theta_b_tot, hist_trk_theta_c_tot, hist_trk_theta_btoc_tot], [hist_trk_theta_b_bad, hist_trk_theta_c_bad, hist_trk_theta_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_theta_comp.png", "HIST")
+    plot_hist_diff([hist_trk_phi_b_tot, hist_trk_phi_c_tot, hist_trk_phi_btoc_tot], [hist_trk_phi_b_bad, hist_trk_phi_c_bad, hist_trk_phi_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_phi_comp.png", "HIST")
+    plot_hist_diff([hist_trk_d0_b_tot, hist_trk_d0_c_tot, hist_trk_d0_btoc_tot], [hist_trk_d0_b_bad, hist_trk_d0_c_bad, hist_trk_d0_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_d0_comp.png", "HIST")
+    plot_hist_diff([hist_trk_z0_b_tot, hist_trk_z0_c_tot, hist_trk_z0_btoc_tot], [hist_trk_z0_b_bad, hist_trk_z0_c_bad, hist_trk_z0_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_z0_comp.png", "HIST")
+    plot_hist([hist_no_trk_jet_b_tot, hist_no_trk_jet_c_tot, hist_no_trk_jet_btoc_tot, hist_no_trk_jet_nohf_tot, hist_no_trk_jet_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_no_trk_tot.png", "HIST NOSTACK")
+    plot_hist([hist_frac_trk_b_tot, hist_frac_trk_c_tot, hist_frac_trk_btoc_tot, hist_frac_trk_nohf_tot, hist_frac_trk_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_frac_trk_tot.png", "HIST NOSTACK")
+    plot_hist([hist_no_trk_jet_b_bad, hist_no_trk_jet_c_bad, hist_no_trk_jet_btoc_bad, hist_no_trk_jet_nohf_bad, hist_no_trk_jet_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_no_trk_bad.png", "HIST NOSTACK")
+    plot_hist([hist_frac_trk_b_bad, hist_frac_trk_c_bad, hist_frac_trk_btoc_bad, hist_frac_trk_nohf_bad, hist_frac_trk_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_frac_trk_bad.png", "HIST NOSTACK") 
 
 
 if __name__ == '__main__':

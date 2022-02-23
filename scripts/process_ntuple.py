@@ -229,7 +229,7 @@ def main(argv):
                     t_algo.append(entry.jet_trk_algo[i][j])
                     if incl_vweight:
                         t_vtype.append(entry.jet_trk_vertex_type[i][j])
-                        t_vweight.append(entry.jet_trk_vertex_weight[i][j])
+                        t_vweight.append(entry.jet_trk_vertex_weight[i][j]) #0=novtx, 1=pv, 3=pileup
 
                 track_dict = build_track_dict(entry, i, particle_dict, primary_vertex) #initialize track dictionary
                 track_dict = group_non_hf_tracks(track_dict) #mark related non HF tracks that share a common vertex - i.e. primary vertex tracks
@@ -318,7 +318,7 @@ def main(argv):
                 tfeatures_h['nBLShared'].extend(t_nBLShared)
                 tfeatures_h['nPixSplit'].extend(t_nPixSplit)
                 tfeatures_h['nBLSplit'].extend(t_nBLSplit)
-                if incl_vweight: tfeatures_w['vweight'].extend(t_vweight)
+                if incl_vweight: tfeatures_w['vweight'].extend(t_vweight) 
             
             efeatures['pv_x'].append(entry.truth_PVx)
             efeatures['pv_y'].append(entry.truth_PVy)

@@ -28,7 +28,6 @@ import dgl
 import torch as th
 import torch.nn as nn
 import scipy.optimize as opt
-import scipy.integrate as integrate
 import os,sys,math,glob,time
 import numpy as np
 import ROOT
@@ -199,8 +198,10 @@ def main(argv):
     #initialize matrices for overall SV predictions and plots
     gnn_cm = np.zeros((3,3), dtype=int)
     sv1_cm = np.zeros((3,3), dtype=int)
-    b_tot_alg = b_found_gnn_alg = b_found_sv1_alg = c_tot_alg = c_found_gnn_alg = c_found_sv1_alg = fake_found_gnn_alg = fake_found_sv1_alg = tot_pred_gnn_alg = tot_pred_sv1_alg = 0
-    b_tot_phys = b_found_gnn_phys = b_found_sv1_phys = c_tot_phys = c_found_gnn_phys = c_found_sv1_phys = fake_found_gnn_phys = fake_found_sv1_phys = tot_pred_gnn_phys = tot_pred_sv1_phys = 0
+    b_tp_sv1_alg = b_fn_sv1_alg = c_tp_sv1_alg = c_fn_sv1_alg = fp_sv1_alg = tn_sv1_alg = 0
+    b_tp_gnn_alg = b_fn_gnn_alg = c_tp_gnn_alg = c_fn_gnn_alg = fp_gnn_alg = tn_gnn_alg = 0
+    b_tp_sv1_phys = b_fn_sv1_phys = c_tp_sv1_phys = c_fn_sv1_phys = fp_sv1_phys = tn_sv1_phys = 0
+    b_tp_gnn_phys = b_fn_gnn_phys = c_tp_gnn_phys = c_fn_gnn_phys = fp_gnn_phys = tn_gnn_phys = 0
 
     #evaluate run statistics
     for ibatch in range(batches):
@@ -225,7 +226,7 @@ def main(argv):
                 jet_eta = jet_eta*jet_eta_std+jet_eta_mean
 
             gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
-            true_vertices = find_vertices_bin(g, 'truth', 1.0)
+            true_vertices = find_vertices_bin(g, 'truth', 0.9999)
             sv1_vertex = np.argwhere(g.ndata['reco_use'].cpu().numpy().astype(int)[:,1]).flatten()
             jet_flavor = g.ndata['jet_info'].cpu().numpy().astype(int)[0,0]
             ntrk = g.num_nodes()
@@ -266,7 +267,7 @@ def main(argv):
                     hist_pf_list[0].Fill(1)
 
             no_b = no_c = 0
-            #for each true vertex, fill efficiency/fake rate histograms for best matching GNN/SV1 vertex
+            #for each true vertex, fill histograms showing number of correctly/falsely associated tracks
             true_gnn_vertex_assoc = associate_vertices(gnn_vertex_metrics, 't')
             true_sv1_vertex_assoc = associate_vertices(sv1_vertex_metrics, 't')
             for i, true_vertex in enumerate(true_vertices):
@@ -306,49 +307,53 @@ def main(argv):
             if no_b > 0: no_true_sv_hist_b.Fill(no_b)
             if no_c > 0: no_true_sv_hist_c.Fill(no_c)
 
-            #fill algorithmic efficiency histograms for b/c-jets (only jets with exactly 1 true SV)
-            if no_b == 1 and no_c == 0:
-                b_tot_alg += 1
-                b_found_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]
-                b_found_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
-                sv1_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-            elif no_c == 1 and no_b == 0:
-                c_tot_alg += 1
-                c_found_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]
-                c_found_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
-                sv1_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
-                sv1_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]))
-                gnn_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]))
+            #fill algorithmic efficiency profiles for b/c-jets
+            if no_b > 0:
+                b_tp_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]
+                b_fn_sv1_alg += jet_sv1_cm[1,0]+jet_sv1_cm[2,0]
+                b_tp_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]
+                b_fn_gnn_alg += jet_gnn_cm[1,0]+jet_gnn_cm[2,0]
+                sv1_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_pt_profile_alg_eff_b.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_eta_profile_alg_eff_b.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_ntrk_profile_alg_eff_b.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_lxy_profile_alg_eff_b.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+            elif no_c > 0:
+                c_tp_sv1_alg += jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]
+                c_fn_sv1_alg += jet_sv1_cm[1,0]+jet_sv1_cm[2,0]
+                c_tp_gnn_alg += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]
+                c_fn_gnn_alg += jet_gnn_cm[1,0]+jet_gnn_cm[2,0]
+                sv1_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_pt_profile_alg_eff_c.Fill(jet_pt, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_eta_profile_alg_eff_c.Fill(jet_eta, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_ntrk_profile_alg_eff_c.Fill(ntrk, float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+                sv1_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]))
+                gnn_lxy_profile_alg_eff_c.Fill(Lxy,float(jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]))
+            else:
+                fp_sv1_alg += jet_sv1_cm[0,1]+jet_sv1_cm[0,2]
+                tn_sv1_alg += jet_sv1_cm[0,0]
+                fp_gnn_alg += jet_gnn_cm[0,1]+jet_gnn_cm[0,2]
+                tn_gnn_alg += jet_gnn_cm[0,0]
 
-            #fill algorithmic fake rate histograms
-            if (jet_sv1_cm[0,1]+jet_sv1_cm[0,2]+jet_sv1_cm[1,1]+jet_sv1_cm[1,2]) == 1:
-                tot_pred_sv1_alg += 1
-                fake_found_sv1_alg += float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2])
+            #fill algorithmic fake rate profiless
+            if (jet_sv1_cm[0,1]+jet_sv1_cm[0,2]+jet_sv1_cm[1,1]+jet_sv1_cm[1,2]+jet_sv1_cm[2,1]+jet_sv1_cm[2,2]) == 1:
                 sv1_pt_profile_alg_fr.Fill(jet_pt, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
                 sv1_eta_profile_alg_fr.Fill(jet_eta, float(jet_sv1_cm[0,1]+jet_sv1_cm[0,2]))
-            if (jet_gnn_cm[0,1]+jet_gnn_cm[0,2]+jet_gnn_cm[1,1]+jet_gnn_cm[1,2]) == 1:
-                tot_pred_gnn_alg += 1
-                fake_found_gnn_alg += float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])
+            if (jet_gnn_cm[0,1]+jet_gnn_cm[0,2]+jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_sv1_cm[2,2]) == 1:
                 gnn_pt_profile_alg_fr.Fill(jet_pt, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2]))
                 gnn_eta_profile_alg_fr.Fill(jet_eta, float(jet_gnn_cm[0,1]+jet_gnn_cm[0,2])) 
 
-            #fill physics efficiency histograms for b/c-jets
+            #fill physics efficiency profiles for b/c-jets
             if jet_flavor == 1:
-                b_tot_phys += 1
-                b_found_sv1_phys += float(len(sv1_vertex) != 0)
-                b_found_gnn_phys += float(len(gnn_vertices) != 0)
+                b_tp_sv1_phys += float(len(sv1_vertex) != 0)
+                b_fn_sv1_phys += float(len(sv1_vertex) == 0)
+                b_tp_gnn_phys += float(len(gnn_vertices) != 0)
+                b_fn_gnn_phys += float(len(gnn_vertices) == 0)
                 sv1_pt_profile_phys_eff_b.Fill(jet_pt, float(len(sv1_vertex) != 0))
                 gnn_pt_profile_phys_eff_b.Fill(jet_pt, float(len(gnn_vertices) != 0))
                 sv1_eta_profile_phys_eff_b.Fill(jet_eta, float(len(sv1_vertex) != 0))
@@ -356,25 +361,27 @@ def main(argv):
                 sv1_ntrk_profile_phys_eff_b.Fill(ntrk, float(len(sv1_vertex) != 0))
                 gnn_ntrk_profile_phys_eff_b.Fill(ntrk, float(len(gnn_vertices) != 0))
             elif jet_flavor == 2:
-                c_tot_phys += 1
-                c_found_sv1_phys += float(len(sv1_vertex) != 0)
-                c_found_gnn_phys += float(len(gnn_vertices) != 0)
+                c_tp_sv1_phys += float(len(sv1_vertex) != 0)
+                c_fn_sv1_phys += float(len(sv1_vertex) == 0)
+                c_tp_gnn_phys += float(len(gnn_vertices) != 0)
+                c_fn_gnn_phys += float(len(gnn_vertices) == 0)
                 sv1_pt_profile_phys_eff_c.Fill(jet_pt, float(len(sv1_vertex) != 0))
                 gnn_pt_profile_phys_eff_c.Fill(jet_pt, float(len(gnn_vertices) != 0))
                 sv1_eta_profile_phys_eff_c.Fill(jet_eta, float(len(sv1_vertex) != 0))
                 gnn_eta_profile_phys_eff_c.Fill(jet_eta, float(len(gnn_vertices) != 0))
                 sv1_ntrk_profile_phys_eff_c.Fill(ntrk, float(len(sv1_vertex) != 0))
                 gnn_ntrk_profile_phys_eff_c.Fill(ntrk, float(len(gnn_vertices) != 0))
-                        
+            else:
+                fp_sv1_phys += float(len(sv1_vertex) != 0)
+                tn_sv1_phys += float(len(sv1_vertex) == 0)
+                fp_gnn_phys += float(len(gnn_vertices) != 0)
+                tn_gnn_phys += float(len(gnn_vertices) == 0)
+
             #fill physics fake rate histograms
             if (float(len(sv1_vertex) > 0)):
-                tot_pred_sv1_phys += 1
-                fake_found_sv1_phys += float(jet_flavor == 0)
                 sv1_pt_profile_phys_fr.Fill(jet_pt, float(jet_flavor == 0))
                 sv1_eta_profile_phys_fr.Fill(jet_eta, float(jet_flavor == 0))
             if (float(len(gnn_vertices) > 0)):
-                tot_pred_gnn_phys += 1
-                fake_found_gnn_phys += float(jet_flavor == 0)
                 gnn_pt_profile_phys_fr.Fill(jet_pt, float(jet_flavor == 0))
                 gnn_eta_profile_phys_fr.Fill(jet_eta, float(jet_flavor == 0))
 
@@ -387,39 +394,39 @@ def main(argv):
     print('---------------------------------------------------------------')
     print(f'Edge score threshold: {score_threshold}')
     with np.errstate(divide='ignore'): #ignore divide by zero error for printing
-        print(f'Global algorithmic b-jet efficiency: {b_found_gnn_alg/b_tot_alg:4} (GNN), {b_found_sv1_alg/b_tot_alg:4} (SV1)')
-        print(f'Global algorithmic c-jet efficiency: {c_found_gnn_alg/c_tot_alg:4} (GNN), {c_found_sv1_alg/c_tot_alg:4} (SV1)')
-        print(f'Global algorithmic fake rate: {np.divide(fake_found_gnn_alg,tot_pred_gnn_alg):4} (GNN), {np.divide(fake_found_sv1_alg,tot_pred_sv1_alg):4} (SV1)')
-        print(f'Global physics b-jet efficiency: {b_found_gnn_phys/b_tot_phys:4} (GNN), {b_found_sv1_phys/b_tot_phys:4} (SV1)')
-        print(f'Global physics c-jet efficiency: {c_found_gnn_phys/c_tot_phys:4} (GNN), {c_found_sv1_phys/c_tot_phys:4} (SV1)')
-        print(f'Global physics fake rate: {np.divide(fake_found_gnn_phys,tot_pred_gnn_phys):4} (GNN), {np.divide(fake_found_sv1_phys,tot_pred_sv1_phys):4} (SV1)')
+        print(f'Global algorithmic b-jet efficiency: {b_tp_gnn_alg/(b_tp_gnn_alg+b_fn_gnn_alg):4} (GNN), {b_tp_sv1_alg/(b_tp_sv1_alg+b_fn_sv1_alg):4} (SV1)')
+        print(f'Global algorithmic c-jet efficiency: {c_tp_gnn_alg/(c_tp_gnn_alg+c_fn_gnn_alg):4} (GNN), {c_tp_sv1_alg/(c_tp_sv1_alg+c_fn_sv1_alg):4} (SV1)')
+        print(f'Global algorithmic fake rate: {fp_gnn_alg/(fp_gnn_alg+b_tp_gnn_alg+c_tp_gnn_alg):4} (GNN), {fp_sv1_alg/(fp_sv1_alg+b_tp_sv1_alg+c_tp_sv1_alg):4} (SV1)')
+        print(f'Global physics b-jet efficiency: {b_tp_gnn_phys/(b_tp_gnn_phys+b_fn_gnn_phys):4} (GNN), {b_tp_sv1_phys/(b_tp_sv1_phys+b_fn_sv1_phys):4} (SV1)')
+        print(f'Global physics c-jet efficiency: {c_tp_gnn_phys/(c_tp_gnn_phys+c_fn_gnn_phys):4} (GNN), {c_tp_sv1_phys/(c_tp_sv1_phys+c_fn_sv1_phys):4} (SV1)')
+        print(f'Global physics fake rate: {fp_gnn_phys/(fp_gnn_phys+b_tp_gnn_phys+c_tp_gnn_phys):4} (GNN), {fp_sv1_phys/(fp_sv1_phys+b_tp_sv1_phys+c_tp_sv1_phys):4} (SV1)')
 
-    plot_profile([sv1_pt_profile_alg_eff_c, gnn_pt_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_pt_c.png")
-    plot_profile([sv1_pt_profile_alg_eff_b, gnn_pt_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_pt_b.png")
-    plot_profile([sv1_eta_profile_alg_eff_c, gnn_eta_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_eta_c.png")
-    plot_profile([sv1_eta_profile_alg_eff_b, gnn_eta_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_eta_b.png")
-    plot_profile([sv1_lxy_profile_alg_eff_b, gnn_lxy_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_lxy_b.png")
-    plot_profile([sv1_lxy_profile_alg_eff_c, gnn_lxy_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_lxy_c.png")
-    plot_profile([sv1_ntrk_profile_alg_eff_b, gnn_ntrk_profile_alg_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_ntrk_b.png")
-    plot_profile([sv1_ntrk_profile_alg_eff_c, gnn_ntrk_profile_alg_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_eff_ntrk_c.png")
-    plot_profile([sv1_pt_profile_phys_eff_c, gnn_pt_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_pt_c.png")
-    plot_profile([sv1_pt_profile_phys_eff_b, gnn_pt_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_pt_b.png")
-    plot_profile([sv1_eta_profile_phys_eff_c, gnn_eta_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_eta_c.png")
-    plot_profile([sv1_eta_profile_phys_eff_b, gnn_eta_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_eta_b.png")
-    plot_profile([sv1_ntrk_profile_phys_eff_b, gnn_ntrk_profile_phys_eff_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_ntrk_b.png")
-    plot_profile([sv1_ntrk_profile_phys_eff_c, gnn_ntrk_profile_phys_eff_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_eff_ntrk_c.png")
-    plot_profile([sv1_pt_profile_alg_fr, gnn_pt_profile_alg_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_fr_pt.png")
-    plot_profile([sv1_eta_profile_alg_fr, gnn_eta_profile_alg_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_alg_fr_eta.png")
-    plot_profile([sv1_pt_profile_phys_fr, gnn_pt_profile_phys_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_fr_pt.png")
-    plot_profile([sv1_eta_profile_phys_fr, gnn_eta_profile_phys_fr], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_phys_fr_eta.png")
-    plot_profile([sv1_pt_profile_corrp_c, gnn_pt_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_c.png")
-    plot_profile([sv1_pt_profile_corrp_b, gnn_pt_profile_corrp_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_pt_b.png")
-    plot_profile([sv1_eta_profile_corrp_c, gnn_eta_profile_corrp_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_eta_c.png")
-    plot_profile([sv1_eta_profile_corrp_b, gnn_eta_profile_corrp_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_corrp_eta_b.png")
-    plot_profile([sv1_pt_profile_fakep_c, gnn_pt_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_c.png")
-    plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_pt_b.png")
-    plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_c.png")
-    plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], [0.0, 1.4], False, outfile_name+"_fakep_eta_b.png")
+    plot_profile([sv1_pt_profile_alg_eff_c, gnn_pt_profile_alg_eff_c], ["SV1", "GNN"], outfile_name+"_alg_eff_pt_c.png")
+    plot_profile([sv1_pt_profile_alg_eff_b, gnn_pt_profile_alg_eff_b], ["SV1", "GNN"], outfile_name+"_alg_eff_pt_b.png")
+    plot_profile([sv1_eta_profile_alg_eff_c, gnn_eta_profile_alg_eff_c], ["SV1", "GNN"], outfile_name+"_alg_eff_eta_c.png")
+    plot_profile([sv1_eta_profile_alg_eff_b, gnn_eta_profile_alg_eff_b], ["SV1", "GNN"], outfile_name+"_alg_eff_eta_b.png")
+    plot_profile([sv1_lxy_profile_alg_eff_b, gnn_lxy_profile_alg_eff_b], ["SV1", "GNN"], outfile_name+"_alg_eff_lxy_b.png")
+    plot_profile([sv1_lxy_profile_alg_eff_c, gnn_lxy_profile_alg_eff_c], ["SV1", "GNN"], outfile_name+"_alg_eff_lxy_c.png")
+    plot_profile([sv1_ntrk_profile_alg_eff_b, gnn_ntrk_profile_alg_eff_b], ["SV1", "GNN"], outfile_name+"_alg_eff_ntrk_b.png")
+    plot_profile([sv1_ntrk_profile_alg_eff_c, gnn_ntrk_profile_alg_eff_c], ["SV1", "GNN"], outfile_name+"_alg_eff_ntrk_c.png")
+    plot_profile([sv1_pt_profile_phys_eff_c, gnn_pt_profile_phys_eff_c], ["SV1", "GNN"], outfile_name+"_phys_eff_pt_c.png")
+    plot_profile([sv1_pt_profile_phys_eff_b, gnn_pt_profile_phys_eff_b], ["SV1", "GNN"], outfile_name+"_phys_eff_pt_b.png")
+    plot_profile([sv1_eta_profile_phys_eff_c, gnn_eta_profile_phys_eff_c], ["SV1", "GNN"], outfile_name+"_phys_eff_eta_c.png")
+    plot_profile([sv1_eta_profile_phys_eff_b, gnn_eta_profile_phys_eff_b], ["SV1", "GNN"], outfile_name+"_phys_eff_eta_b.png")
+    plot_profile([sv1_ntrk_profile_phys_eff_b, gnn_ntrk_profile_phys_eff_b], ["SV1", "GNN"], outfile_name+"_phys_eff_ntrk_b.png")
+    plot_profile([sv1_ntrk_profile_phys_eff_c, gnn_ntrk_profile_phys_eff_c], ["SV1", "GNN"], outfile_name+"_phys_eff_ntrk_c.png")
+    plot_profile([sv1_pt_profile_alg_fr, gnn_pt_profile_alg_fr], ["SV1", "GNN"], outfile_name+"_alg_fr_pt.png")
+    plot_profile([sv1_eta_profile_alg_fr, gnn_eta_profile_alg_fr], ["SV1", "GNN"], outfile_name+"_alg_fr_eta.png")
+    plot_profile([sv1_pt_profile_phys_fr, gnn_pt_profile_phys_fr], ["SV1", "GNN"], outfile_name+"_phys_fr_pt.png")
+    plot_profile([sv1_eta_profile_phys_fr, gnn_eta_profile_phys_fr], ["SV1", "GNN"], outfile_name+"_phys_fr_eta.png")
+    plot_profile([sv1_pt_profile_corrp_c, gnn_pt_profile_corrp_c], ["SV1", "GNN"], outfile_name+"_corrp_pt_c.png")
+    plot_profile([sv1_pt_profile_corrp_b, gnn_pt_profile_corrp_b], ["SV1", "GNN"], outfile_name+"_corrp_pt_b.png")
+    plot_profile([sv1_eta_profile_corrp_c, gnn_eta_profile_corrp_c], ["SV1", "GNN"], outfile_name+"_corrp_eta_c.png")
+    plot_profile([sv1_eta_profile_corrp_b, gnn_eta_profile_corrp_b], ["SV1", "GNN"], outfile_name+"_corrp_eta_b.png")
+    plot_profile([sv1_pt_profile_fakep_c, gnn_pt_profile_fakep_c], ["SV1", "GNN"], outfile_name+"_fakep_pt_c.png")
+    plot_profile([sv1_pt_profile_fakep_b, gnn_pt_profile_fakep_b], ["SV1", "GNN"], outfile_name+"_fakep_pt_b.png")
+    plot_profile([sv1_eta_profile_fakep_c, gnn_eta_profile_fakep_c], ["SV1", "GNN"], outfile_name+"_fakep_eta_c.png")
+    plot_profile([sv1_eta_profile_fakep_b, gnn_eta_profile_fakep_b], ["SV1", "GNN"], outfile_name+"_fakep_eta_b.png")
     
     plot_bar([gnn_trk_assoc_hist_fake], trk_flavor_labels, [], False, True, outfile_name+"_trk_assoc_fake.png", "HIST")
     plot_bar([gnn_trk_assoc_hist_true], trk_flavor_labels, [], False, True, outfile_name+"_trk_assoc_true.png", "HIST")
@@ -427,19 +434,23 @@ def main(argv):
     ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]
     for i in range(len(hist_list_list)):
-        plot_metric_hist(hist_list_list[i], [0.0,1.4], outfile_name+ext[i])
+        plot_hist(hist_list_list[i], ["SV1","GNN"], True, False, False, outfile_name+ext[i], "")
 
     #evaluate roc data
     if plot_roc:
         score_threshold_array = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        c_alg_efficiency = np.zeros(len(score_threshold_array))
-        b_alg_efficiency = np.zeros(len(score_threshold_array))
-        alg_fake_rate_num = np.zeros(len(score_threshold_array))
-        alg_fake_rate_denom = np.zeros(len(score_threshold_array))
-        c_phys_efficiency = np.zeros(len(score_threshold_array))
-        b_phys_efficiency = np.zeros(len(score_threshold_array))
-        phys_fake_rate_num = np.zeros(len(score_threshold_array))
-        phys_fake_rate_denom = np.zeros(len(score_threshold_array))
+        b_tp_gnn_alg_array = np.zeros(len(score_threshold_array))
+        c_tp_gnn_alg_array = np.zeros(len(score_threshold_array))
+        b_fn_gnn_alg_array = np.zeros(len(score_threshold_array))
+        c_fn_gnn_alg_array = np.zeros(len(score_threshold_array))
+        fp_gnn_alg_array = np.zeros(len(score_threshold_array))
+        tn_gnn_alg_array = np.zeros(len(score_threshold_array))
+        b_tp_gnn_phys_array = np.zeros(len(score_threshold_array))
+        c_tp_gnn_phys_array = np.zeros(len(score_threshold_array))
+        b_fn_gnn_phys_array = np.zeros(len(score_threshold_array))
+        c_fn_gnn_phys_array = np.zeros(len(score_threshold_array))
+        fp_gnn_phys_array = np.zeros(len(score_threshold_array))
+        tn_gnn_phys_array = np.zeros(len(score_threshold_array))
 
         for ibatch in range(batches):
             #calculate batch indices
@@ -471,63 +482,57 @@ def main(argv):
                         elif vertex_flavor == 2:
                             no_c += 1
 
-                    #fill algorithmic efficiency for b/c-jets (only jets with exactly 1 true SV)
-                    if no_b == 1 and no_c == 0:
-                        b_alg_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
-                    elif no_c == 1 and no_b == 0:
-                        c_alg_efficiency[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]
+                    if no_b > 0:
+                        b_tp_gnn_alg_array[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]
+                        b_fn_gnn_alg_array[ist] += jet_gnn_cm[1,0]+jet_gnn_cm[2,0]
+                    elif no_c > 0:
+                        c_tp_gnn_alg_array[ist] += jet_gnn_cm[1,1]+jet_gnn_cm[1,2]+jet_gnn_cm[2,1]+jet_gnn_cm[2,2]
+                        c_fn_gnn_alg_array[ist] += jet_gnn_cm[1,0]+jet_gnn_cm[2,0]
+                    else:
+                        fp_gnn_alg_array[ist] += jet_gnn_cm[0,1]+jet_gnn_cm[0,2]
+                        tn_gnn_alg_array[ist] += jet_sv1_cm[0,0]
 
-                    #fill algorithmic fake rate histograms (only jets with exactly 1 true SV)
-                    if (jet_gnn_cm[0,1]+jet_gnn_cm[0,2]+jet_gnn_cm[1,1]+jet_gnn_cm[1,2]) == 1:
-                        alg_fake_rate_num[ist] += jet_gnn_cm[0,1]+jet_gnn_cm[0,2]
-                        alg_fake_rate_denom[ist] += 1
-
-                    #fill physics efficiency histograms for b/c-jets
                     if jet_flavor == 1:
-                        b_phys_efficiency[ist] += float(len(gnn_vertices) != 0)
+                        b_tp_gnn_phys_array[ist] += float(len(gnn_vertices) != 0)
+                        b_fn_gnn_phys_array[ist] += float(len(gnn_vertices) == 0)
                     elif jet_flavor == 2:
-                        c_phys_efficiency[ist] += float(len(gnn_vertices) != 0)
+                        c_tp_gnn_phys_array[ist] += float(len(gnn_vertices) != 0)
+                        c_fn_gnn_phys_array[ist] += float(len(gnn_vertices) == 0)
+                    else:
+                        fp_gnn_phys_array[ist] += float(len(gnn_vertices) != 0)
+                        tn_gnn_phys_array[ist] += float(len(gnn_vertices) == 0)
 
-                    if (float(len(gnn_vertices) > 0)):
-                        phys_fake_rate_denom[ist] += 1
-                        phys_fake_rate_num[ist] += float(jet_flavor == 0)
+        b_alg_efficiency = np.divide(b_tp_gnn_alg_array,b_tp_gnn_alg_array+b_fn_gnn_alg_array)
+        c_alg_efficiency = np.divide(c_tp_gnn_alg_array,c_tp_gnn_alg_array+c_fn_gnn_alg_array)
+        alg_fake_rate = np.divide(fp_gnn_alg_array,fp_gnn_alg_array+b_tp_gnn_alg_array+c_tp_gnn_alg_array)
+        sv1_b_alg_efficiency = np.array(b_tp_sv1_alg/(b_tp_sv1_alg+b_fn_sv1_alg))
+        sv1_c_alg_efficiency = np.array(c_tp_sv1_alg/(c_tp_sv1_alg+c_fn_sv1_alg))
+        sv1_alg_fake_rate = np.array(fp_sv1_alg/(fp_sv1_alg+b_tp_sv1_alg+c_tp_sv1_alg))
 
-        b_alg_efficiency = b_alg_efficiency/b_tot_alg
-        c_alg_efficiency = c_alg_efficiency/c_tot_alg
-        alg_fake_rate = np.divide(alg_fake_rate_num,alg_fake_rate_denom)
-        sv1_b_alg_efficiency = np.array([b_found_sv1_alg/b_tot_alg])
-        sv1_c_alg_efficiency = np.array([c_found_sv1_alg/c_tot_alg])
-        sv1_alg_fake_rate = np.array([fake_found_sv1_alg/tot_pred_sv1_alg])
-
-        b_phys_efficiency = b_phys_efficiency/b_tot_phys
-        c_phys_efficiency = c_phys_efficiency/c_tot_phys
-        phys_fake_rate = np.divide(phys_fake_rate_num,phys_fake_rate_denom)
-        sv1_b_phys_efficiency = np.array([b_found_sv1_phys/b_tot_phys])
-        sv1_c_phys_efficiency = np.array([c_found_sv1_phys/c_tot_phys])
-        sv1_phys_fake_rate = np.array([fake_found_sv1_phys/tot_pred_sv1_phys])
+        b_phys_efficiency = np.divide(b_tp_gnn_phys_array,b_tp_gnn_phys_array+b_fn_gnn_phys_array)
+        c_phys_efficiency = np.divide(c_tp_gnn_phys_array,c_tp_gnn_phys_array+c_fn_gnn_phys_array)
+        phys_fake_rate = np.divide(fp_gnn_phys_array,fp_gnn_phys_array+b_tp_gnn_phys_array+c_tp_gnn_phys_array)
+        sv1_b_phys_efficiency = np.array(b_tp_sv1_phys/(b_tp_sv1_phys+b_fn_sv1_phys))
+        sv1_c_phys_efficiency = np.array(c_tp_sv1_phys/(c_tp_sv1_phys+c_fn_sv1_phys))
+        sv1_phys_fake_rate = np.array(fp_sv1_phys/(fp_sv1_phys+b_tp_sv1_phys+c_tp_sv1_phys))
 
         alg_roc_curve_b = TGraph(len(b_alg_efficiency), alg_fake_rate, b_alg_efficiency)
         alg_roc_curve_c = TGraph(len(c_alg_efficiency), alg_fake_rate, c_alg_efficiency)
-        sv1_alg_eff_b = TGraph(len(sv1_b_alg_efficiency), sv1_alg_fake_rate, sv1_b_alg_efficiency)
-        sv1_alg_eff_c = TGraph(len(sv1_c_alg_efficiency), sv1_alg_fake_rate, sv1_c_alg_efficiency)
+        sv1_alg_eff_b = TGraph(sv1_b_alg_efficiency.size, sv1_alg_fake_rate, sv1_b_alg_efficiency)
+        sv1_alg_eff_c = TGraph(sv1_c_alg_efficiency.size, sv1_alg_fake_rate, sv1_c_alg_efficiency)
         plot_roc_curve(alg_roc_curve_b, alg_roc_curve_c, sv1_alg_eff_b, sv1_alg_eff_c, [0.0,1.0], [0.,1.0], "algorithmic", outfile_name+"_alg_roc.png")
 
         phys_roc_curve_b = TGraph(len(b_phys_efficiency), phys_fake_rate, b_phys_efficiency)
         phys_roc_curve_c = TGraph(len(c_phys_efficiency), phys_fake_rate, c_phys_efficiency)
-        sv1_phys_eff_b = TGraph(len(sv1_b_phys_efficiency), sv1_phys_fake_rate, sv1_b_phys_efficiency)
-        sv1_phys_eff_c = TGraph(len(sv1_c_phys_efficiency), sv1_phys_fake_rate, sv1_c_phys_efficiency)
+        sv1_phys_eff_b = TGraph(sv1_b_phys_efficiency.size, sv1_phys_fake_rate, sv1_b_phys_efficiency)
+        sv1_phys_eff_c = TGraph(sv1_c_phys_efficiency.size, sv1_phys_fake_rate, sv1_c_phys_efficiency)
         plot_roc_curve(phys_roc_curve_b, phys_roc_curve_c, sv1_phys_eff_b, sv1_phys_eff_c, [0.0,1.0], [0.,1.0], "physics", outfile_name+"_phys_roc.png")
 
         #calculate area under ROC curve
-        def f_fit(x,a,b,c,d,e): return a*x**4+b*x**3+c*x**2+d*x+e #4th order polynomial fitting function
-        alg_roc_curve_b_fit = opt.curve_fit(f_fit, alg_fake_rate, b_alg_efficiency)
-        alg_roc_curve_b_auc = integrate.quad(lambda x: f_fit(x, alg_roc_curve_b_fit[0], alg_roc_curve_b_fit[1], alg_roc_curve_b_fit[2], alg_roc_curve_b_fit[3], alg_roc_curve_b_fit[4], alg_roc_curve_b_fit[5]), 0, 1)
-        alg_roc_curve_c_fit = opt.curve_fit(f_fit, alg_fake_rate, c_alg_efficiency)
-        alg_roc_curve_c_auc = integrate.quad(lambda x: f_fit(x, alg_roc_curve_c_fit[0], alg_roc_curve_c_fit[1], alg_roc_curve_c_fit[2], alg_roc_curve_c_fit[3], alg_roc_curve_c_fit[4], alg_roc_curve_c_fit[5]), 0, 1)
-        phys_roc_curve_b_fit = opt.curve_fit(f_fit, phys_fake_rate, b_phys_efficiency)
-        phys_roc_curve_b_auc = integrate.quad(lambda x: f_fit(x, phys_roc_curve_b_fit[0], phys_roc_curve_b_fit[1], phys_roc_curve_b_fit[2], phys_roc_curve_b_fit[3], phys_roc_curve_b_fit[4], phys_roc_curve_b_fit[5]), 0, 1)
-        phys_roc_curve_c_fit = opt.curve_fit(f_fit, phys_fake_rate, c_phys_efficiency)
-        phys_roc_curve_c_auc = integrate.quad(lambda x: f_fit(x, phys_roc_curve_c_fit[0], phys_roc_curve_c_fit[1], phys_roc_curve_c_fit[2], phys_roc_curve_c_fit[3], phys_roc_curve_c_fit[4], phys_roc_curve_c_fit[5]), 0, 1)
+        alg_roc_curve_b_auc = np.trapz(np.flip(b_alg_efficiency), x=np.flip(alg_fake_rate))
+        alg_roc_curve_c_auc = np.trapz(np.flip(c_alg_efficiency), x=np.flip(alg_fake_rate))
+        phys_roc_curve_b_auc = np.trapz(np.flip(b_phys_efficiency), x=np.flip(phys_fake_rate))
+        phys_roc_curve_c_auc = np.trapz(np.flip(c_phys_efficiency), x=np.flip(phys_fake_rate))
         print("AuC for algorithmic b: {}".format(alg_roc_curve_b_auc))
         print("AuC for algorithmic c: {}".format(alg_roc_curve_c_auc))
         print("AuC for physics b: {}".format(phys_roc_curve_b_auc))
