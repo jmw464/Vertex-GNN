@@ -6,14 +6,13 @@
 #SBATCH --error=proc_%j.err
 #SBATCH --output=proc_%j.out
 
-
 NTUPLES="user.jmwagner.27266826.Akt4EMPf_BTagging201903._000006 user.jmwagner.27266824.Akt4EMPf_BTagging201903._000006"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh06_tt06_cut_v6c
+DATANAME=btag_zh06_tt06_cut_v7
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
-ENTRIES=( 150000 150000 ) #jets used per file (after cuts)
+ENTRIES=( 300000 300000 ) #jets used per file (after cuts)
 
 NORMED=1
 

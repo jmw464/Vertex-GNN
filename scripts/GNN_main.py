@@ -61,8 +61,10 @@ def main(argv):
     multi_class = args.multi_class
 
     #import options from option file
+    use_gpu = options.learning_rate
     learning_rate = options.learning_rate
     batch_size = options.batch_size
+    dropout = options.dropout
     attention_heads = options.attention_heads
     nodemlp_sizes = options.nodemlp_sizes
     gat_sizes = options.gat_sizes
@@ -74,7 +76,7 @@ def main(argv):
     #---------------------------------------------------DATA-IMPORT-------------------------------------------------
 
     start_time = time.time()
-    print("Importing input data.")
+    print("Importing input data.", flush=True)
     
     #set relevant filenames
     if use_normed:
@@ -119,17 +121,17 @@ def main(argv):
         b_frac = float(paramfile.readline())
         c_frac = float(paramfile.readline())
     else:
-        print("ERROR: Specified parameter file not found")
+        print("ERROR: Specified parameter file not found", flush=True)
         return 1
 
     p_time = time.time()-start_time
-    print("Finished importing input data. Time elapsed: {}s.\n".format(p_time))
+    print("Finished importing input data. Time elapsed: {}s.\n".format(p_time), flush=True)
 
     #reweight positive labels automatically if desired
     if reweight:
         pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
         mult_weights = th.tensor([1./(1-b_frac-c_frac), 1./b_frac, 1./c_frac])
-        print("Setting positive weight to {}".format(pos_weight))
+        print("Setting positive weight to {}".format(pos_weight), flush=True)
     else:
         pos_weight = th.tensor([1])
         mult_weights = th.tensor([1., 1., 1.])
@@ -139,23 +141,32 @@ def main(argv):
     val_batches = int(math.ceil(val_len/batch_size))
     train_batches = int(math.ceil(train_len/batch_size))
 
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
-
     #set up loss
     if not multi_class:
-        loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum').to(device)
+        loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum')
         outfeats = 1
         cm = np.zeros((2,2),dtype=int)
         activation = nn.Sigmoid()
         labeltype = 'bin_labels'
     else:
-        loss = nn.CrossEntropyLoss(weight=mult_weights).double().to(device)
+        loss = nn.CrossEntropyLoss(weight=mult_weights).double()
         outfeats = 3
         cm = np.zeros((3,3),dtype=int)
         activation = nn.Softmax(dim=1)
         labeltype = 'mult_labels'
 
-    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads).double().to(device)
+    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads, dropout).double()
+    
+    if th.cuda.is_available() and use_gpu:
+        device = th.device('cuda')
+        print("Found {} GPUs".format(th.cuda.device_count()))
+        #if th.cuda.device_count() > 1: model = th.nn.DataParallel(model)
+    else:
+        device = th.device('cpu')
+    model.to(device)
+    loss.to(device)
+    device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
+
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
         
@@ -163,10 +174,10 @@ def main(argv):
     val_loss_array = np.zeros(nepochs)
 
     #print model parameters
-    print("Model built. Parameters:")
+    print("Model built. Parameters:", flush=True)
     for name, param in model.named_parameters():
-        print(name, param.size(), param.requires_grad)
-    print("")
+        print(name, param.size(), param.requires_grad, flush=True)
+    print("", flush=True)
 
     #load existing checkpoint
     if load_checkpoint and os.path.exists(checkpointfile_name):
@@ -174,17 +185,22 @@ def main(argv):
         model.load_state_dict(checkpoint['model_state_dict'])
         opt.load_state_dict(checkpoint['optimizer_state_dict'])
         start_epoch = checkpoint['epoch']+1
-        print("Loading previous model. Starting from epoch {}.".format(start_epoch))
+        print("Loading previous model. Starting from epoch {}.".format(start_epoch), flush=True)
     else:
         start_epoch = 1
+
+    #initialize multiprocessing on GPUs
+    #if th.cuda.is_available():
+    #    th.distributed.init_process_group(backend='nccl')
+    #    model = th.nn.parallel.DistributedDataParallel(model)
 
     #----------------------------------------------------TRAINING---------------------------------------------------
 
     #main training loop
     t_time = time.time()-start_time
-    print("Beginning training. Running on {}. Time elapsed: {}s.\n".format(device, t_time))
+    print("Beginning training. Running on {}. Time elapsed: {}s.\n".format(device, t_time), flush=True)
     for epoch in range(start_epoch,nepochs+1):
-        print("Epoch: {}".format(epoch))
+        print("Epoch: {}".format(epoch), flush=True)
         
         #training
         total_labels = 0
@@ -221,7 +237,7 @@ def main(argv):
             #evaluate loss
             batch_labels = batch.edata['bin_labels'].size()[0]
             total_labels += batch_labels
-            print("Training loss: {}".format(pred_lt.item()/batch_labels))
+            print("Training loss: {}".format(pred_lt.item()/batch_labels), flush=True)
             train_loss_array[epoch-1] += pred_lt.item()
 
             if use_lr_scheduler: scheduler.step()
@@ -263,7 +279,7 @@ def main(argv):
             #evaluate loss
             batch_labels = val_batch.edata['bin_labels'].size()[0]
             total_labels += batch_labels
-            print("Validation loss: {}".format(pred_lv.item()/batch_labels))
+            print("Validation loss: {}".format(pred_lv.item()/batch_labels), flush=True)
             val_loss_array[epoch-1] += pred_lv.item()
 
         #normalize loss
@@ -271,51 +287,52 @@ def main(argv):
 
         #print validation results
         e_time = time.time()-start_time
-        print('Time elapsed: {}s.\n'.format(e_time))
+        print('Time elapsed: {}s.\n'.format(e_time), flush=True)
 
-    print("Training finished. Evaluating model.\n")
+    print("Training finished. Evaluating model.\n", flush=True)
 
     #---------------------------------------------------EVALUATION-------------------------------------------------- 
 
     overall_g_list = []
 
     #testing
-    model.eval()
-    for ibatch in range(test_batches):
+    with th.no_grad():
+        model.eval()
+        for ibatch in range(test_batches):
+
+            #load batch from file
+            istart = ibatch*batch_size
+            if ibatch == (test_batches-1) and test_len%batch_size != 0:
+                iend = istart + (test_len%batch_size)
+            else:
+                iend = (ibatch+1)*batch_size
+            test_batch = dgl.batch(dgl.load_graphs(test_infile_name, list(range(istart, iend)))[0])
+
+            #construct feature matrix
+            test_features = test_batch.ndata['features_base']
+            if incl_vweight: test_features = th.cat((test_features, test_batch.ndata['features_vweight']),dim=1)
+            if incl_errors: test_features = th.cat((test_features, test_batch.ndata['features_errors']),dim=1)
+            if incl_hits: test_features = th.cat((test_features, test_batch.ndata['features_hits']),dim=1)
+            if incl_corr: test_features = th.cat((test_features, test_batch.ndata['features_corr']),dim=1)
+
+            #process batch
+            test_batch = test_batch.to(device)
+            test_features = test_features.to(device)
+            edge_labels = test_batch.edata[labeltype]
         
-        #load batch from file
-        istart = ibatch*batch_size
-        if ibatch == (test_batches-1) and test_len%batch_size != 0:
-            iend = istart + (test_len%batch_size)
-        else:
-            iend = (ibatch+1)*batch_size
-        test_batch = dgl.batch(dgl.load_graphs(test_infile_name, list(range(istart, iend)))[0])
-
-        #construct feature matrix
-        test_features = test_batch.ndata['features_base']
-        if incl_vweight: test_features = th.cat((test_features, test_batch.ndata['features_vweight']),dim=1)
-        if incl_errors: test_features = th.cat((test_features, test_batch.ndata['features_errors']),dim=1)
-        if incl_hits: test_features = th.cat((test_features, test_batch.ndata['features_hits']),dim=1)
-        if incl_corr: test_features = th.cat((test_features, test_batch.ndata['features_corr']),dim=1)
-
-        #process batch
-        test_batch = test_batch.to(device)
-        test_features = test_features.to(device)
-        edge_labels = test_batch.edata[labeltype]
+            #evaluate results
+            pred = activation(model(test_batch, test_features).float()).cpu().detach().numpy()
+            true = test_batch.edata[labeltype].cpu().numpy().astype(int) 
         
-        #evaluate results
-        pred = activation(model(test_batch, test_features).float()).cpu().detach().numpy()
-        true = test_batch.edata[labeltype].cpu().numpy().astype(int) 
-        
-        test_batch.edata['pred'] = activation(test_batch.edata['pred'])
+            test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
-        g_test_list = dgl.unbatch(test_batch)
-        overall_g_list.extend(g_test_list)
+            g_test_list = dgl.unbatch(test_batch)
+            overall_g_list.extend(g_test_list)
 
-        if not multi_class:
-            cm += evaluate_confusion_bin(true, pred.round().astype(int))
-        else:
-            cm += evaluate_confusion_mult(true, pred.round().astype(int))
+            if not multi_class:
+                cm += evaluate_confusion_bin(true, pred.round().astype(int))
+            else:
+                cm += evaluate_confusion_mult(true, pred.round().astype(int))
 
     #print test results
     print_output(multi_class, cm)

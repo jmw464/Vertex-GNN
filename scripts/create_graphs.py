@@ -117,7 +117,9 @@ def main(argv):
 
         #check if outfile already exists and skip if it's newer than infile unless it's the last prevously processed file (in case more entries are being added)
         if ifile+1 != len(outfiles) and os.path.exists(outfiles[ifile+1]) and os.path.exists(outfiles[ifile]) and os.path.getmtime(outfiles[ifile]) > os.path.getmtime(infile_name):
-            print("Current version of "+os.path.basename(outfiles[ifile])+" already exists. Skipping file.")
+            ngraphs = len(dgl.load_graphs(outfiles[ifile])[0])
+            passed_graphs += ngraphs
+            print("Current version of "+os.path.basename(outfiles[ifile])+" already exists and contains "+str(ngraphs)+" jets. Skipping file.")
             continue
 
         infile = h5py.File(infile_name, "r")

@@ -11,7 +11,6 @@
 
 import numpy as np
 import torch as th
-import ROOT
 import dgl
 
 

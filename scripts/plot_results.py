@@ -49,7 +49,6 @@ def main(argv):
 
     #import options from option file
     batch_size = options.batch_size
-    atlasstyle = options.use_atlas_style
     track_pt_bound = options.track_pt_bound
     track_d0_bound = options.track_d0_bound
     track_z0_bound = options.track_z0_bound
@@ -58,9 +57,7 @@ def main(argv):
     ntrk_bound = options.ntrk_bound
     bin_threshold = options.bin_threshold
     mult_threshold = options.mult_threshold
-
-
-    if atlasstyle: SetAtlasStyle()
+    cut_string = options.cut_string
 
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
@@ -95,81 +92,81 @@ def main(argv):
     else:
         multi_class = False
 
-    hist_trk_pt_b_tot = TH1D("trk_pt_b_tot", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
-    hist_trk_pt_c_tot = TH1D("trk_pt_c_tot", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
-    hist_trk_pt_btoc_tot = TH1D("trk_pt_btoc_tot", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
-    hist_trk_pt_b_bad = TH1D("trk_pt_b_bad", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
-    hist_trk_pt_c_bad = TH1D("trk_pt_c_bad", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
-    hist_trk_pt_btoc_bad = TH1D("trk_pt_btoc_bad", "Normalized track pT distribution in test data (total - bad jets);pT [GeV];Difference in normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_b_tot = TH1D("trk_pt_b_tot", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_c_tot = TH1D("trk_pt_c_tot", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_btoc_tot = TH1D("trk_pt_btoc_tot", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_b_bad = TH1D("trk_pt_b_bad", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_c_bad = TH1D("trk_pt_c_bad", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
+    hist_trk_pt_btoc_bad = TH1D("trk_pt_btoc_bad", ";pT [GeV];Normalized entries", 20, track_pt_bound[0], track_pt_bound[1])
     
-    hist_trk_theta_b_tot = TH1D("trk_theta_b_tot", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi)
-    hist_trk_theta_c_tot = TH1D("trk_theta_c_tot", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi)
-    hist_trk_theta_btoc_tot = TH1D("trk_theta_btoc_tot", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi)
-    hist_trk_theta_b_bad = TH1D("trk_theta_b_bad", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi)
-    hist_trk_theta_c_bad = TH1D("trk_theta_c_bad", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi)
-    hist_trk_theta_btoc_bad = TH1D("trk_theta_btoc_bad", "Normalized track #theta distribution in test data (total - bad jets);#theta;Difference in normalized entries", 20, 0, math.pi) 
+    hist_trk_theta_b_tot = TH1D("trk_theta_b_tot", ";#theta;Normalized entries", 20, 0, math.pi)
+    hist_trk_theta_c_tot = TH1D("trk_theta_c_tot", ";#theta;Normalized entries", 20, 0, math.pi)
+    hist_trk_theta_btoc_tot = TH1D("trk_theta_btoc_tot", ";#theta;Normalized entries", 20, 0, math.pi)
+    hist_trk_theta_b_bad = TH1D("trk_theta_b_bad", ";#theta;Normalized entries", 20, 0, math.pi)
+    hist_trk_theta_c_bad = TH1D("trk_theta_c_bad", ";#theta;Normalized entries", 20, 0, math.pi)
+    hist_trk_theta_btoc_bad = TH1D("trk_theta_btoc_bad", ";#theta;Normalized entries", 20, 0, math.pi) 
 
-    hist_trk_phi_b_tot = TH1D("trk_phi_b_tot", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
-    hist_trk_phi_c_tot = TH1D("trk_phi_c_tot", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
-    hist_trk_phi_btoc_tot = TH1D("trk_phi_btoc_tot", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
-    hist_trk_phi_b_bad = TH1D("trk_phi_b_bad", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
-    hist_trk_phi_c_bad = TH1D("trk_phi_c_bad", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
-    hist_trk_phi_btoc_bad = TH1D("trk_phi_btoc_bad", "Normalized track #phi distribution in test data (total - bad jets);#phi;Difference in normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_b_tot = TH1D("trk_phi_b_tot", ";#phi;Normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_c_tot = TH1D("trk_phi_c_tot", ";#phi;Normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_btoc_tot = TH1D("trk_phi_btoc_tot", ";#phi;Normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_b_bad = TH1D("trk_phi_b_bad", ";#phi;Normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_c_bad = TH1D("trk_phi_c_bad", ";#phi;Normalized entries", 20, -math.pi, math.pi)
+    hist_trk_phi_btoc_bad = TH1D("trk_phi_btoc_bad", ";#phi;Normalized entries", 20, -math.pi, math.pi)
 
-    hist_trk_z0_b_tot = TH1D("trk_z0_b_tot", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
-    hist_trk_z0_c_tot = TH1D("trk_z0_c_tot", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
-    hist_trk_z0_btoc_tot = TH1D("trk_z0_btoc_tot", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
-    hist_trk_z0_b_bad = TH1D("trk_z0_b_bad", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
-    hist_trk_z0_c_bad = TH1D("trk_z0_c_bad", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
-    hist_trk_z0_btoc_bad = TH1D("trk_z0_btoc_bad", "Normalized track z0 distribution in test data (total - bad jets);z0 [mm];Difference in normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_b_tot = TH1D("trk_z0_b_tot", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_c_tot = TH1D("trk_z0_c_tot", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_btoc_tot = TH1D("trk_z0_btoc_tot", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_b_bad = TH1D("trk_z0_b_bad", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_c_bad = TH1D("trk_z0_c_bad", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
+    hist_trk_z0_btoc_bad = TH1D("trk_z0_btoc_bad", ";z0 [mm];Normalized entries", 20, -track_z0_bound, track_z0_bound)
 
-    hist_trk_d0_b_tot = TH1D("trk_d0_b_tot", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
-    hist_trk_d0_c_tot = TH1D("trk_d0_c_tot", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
-    hist_trk_d0_btoc_tot = TH1D("trk_d0_btoc_tot", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
-    hist_trk_d0_b_bad = TH1D("trk_d0_b_bad", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
-    hist_trk_d0_c_bad = TH1D("trk_d0_c_bad", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
-    hist_trk_d0_btoc_bad = TH1D("trk_d0_btoc_bad", "Normalized track d0 distribution in test data (total - bad jets);d0 [mm];Difference in normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_b_tot = TH1D("trk_d0_b_tot", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_c_tot = TH1D("trk_d0_c_tot", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_btoc_tot = TH1D("trk_d0_btoc_tot", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_b_bad = TH1D("trk_d0_b_bad", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_c_bad = TH1D("trk_d0_c_bad", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
+    hist_trk_d0_btoc_bad = TH1D("trk_d0_btoc_bad", ";d0 [mm];Normalized entries", 20, -track_d0_bound, track_d0_bound)
 
     bin_edges = np.linspace(-0.5,ntrk_bound+0.5,ntrk_bound+2)
-    hist_no_trk_jet_b_tot = TH1D("no_trk_jet_b_tot", "Number of associated tracks per jet in test data;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_c_tot = TH1D("no_trk_jet_c_tot", "Number of associated tracks per jet in test data;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_btoc_tot = TH1D("no_trk_jet_btoc_tot", "Number of associated tracks per jet in test data;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_nohf_tot = TH1D("no_trk_jet_nohf_tot", "Number of associated tracks per jet in test data;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_nm_tot = TH1D("no_trk_jet_nm_tot", "Number of associated tracks per jet in test data;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_b_bad = TH1D("no_trk_jet_b_bad", "Number of associated tracks per jet among badly reconstructed jets;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_c_bad = TH1D("no_trk_jet_c_bad", "Number of associated tracks per jet among badly reconstructed jets;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_btoc_bad = TH1D("no_trk_jet_btoc_bad", "Number of associated tracks per jet among badly reconstructed jets;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_nohf_bad = TH1D("no_trk_jet_nohf_bad", "Number of associated tracks per jet among badly reconstructed jets;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
-    hist_no_trk_jet_nm_bad = TH1D("no_trk_jet_nm_bad", "Number of associated tracks per jet among badly reconstructed jets;Number of tracks;Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_b_tot = TH1D("no_trk_jet_b_tot", ";Number of tracks (all jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_c_tot = TH1D("no_trk_jet_c_tot", ";Number of tracks (all jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_btoc_tot = TH1D("no_trk_jet_btoc_tot", ";Number of tracks (all jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_nohf_tot = TH1D("no_trk_jet_nohf_tot", ";Number of tracks (all jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_nm_tot = TH1D("no_trk_jet_nm_tot", ";Number of tracks (all jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_b_bad = TH1D("no_trk_jet_b_bad", ";Number of tracks (badly reconstructed jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_c_bad = TH1D("no_trk_jet_c_bad", ";Number of tracks (badly reconstructed jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_btoc_bad = TH1D("no_trk_jet_btoc_bad", ";Number of tracks (badly reconstructed jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_nohf_bad = TH1D("no_trk_jet_nohf_bad", ";Number of tracks (badly reconstructed jets);Normalized entries", ntrk_bound+1, bin_edges)
+    hist_no_trk_jet_nm_bad = TH1D("no_trk_jet_nm_bad", ";Number of tracks (badly reconstructed jets);Normalized entries", ntrk_bound+1, bin_edges)
 
-    hist_frac_trk_b_tot = TH1D("frac_trk_b_tot", "Fraction of tracks per jet in test data;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_c_tot = TH1D("frac_trk_c_tot", "Fraction of tracks per jet in test data;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_nohf_tot = TH1D("frac_trk_nohf_tot", "Fraction of tracks per jet; in test dataTrack fraction;Entries", 10, 0, 1)
-    hist_frac_trk_nm_tot = TH1D("frac_trk_nm_tot", "Fraction of tracks per jet in test data;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_btoc_tot = TH1D("frac_trk_btoc_tot", "Fraction of tracks per jet in test data;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_b_bad = TH1D("frac_trk_b_bad", "Fraction of tracks per jet among badly reconstructed jets;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_c_bad = TH1D("frac_trk_c_bad", "Fraction of tracks per jet among badly reconstructed jets;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_nohf_bad = TH1D("frac_trk_nohf_bad", "Fraction of tracks per jet among badly reconstructed jets;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_nm_bad = TH1D("frac_trk_nm_bad", "Fraction of tracks per jet among badly reconstructed jets;Track fraction;Entries", 10, 0, 1)
-    hist_frac_trk_btoc_bad = TH1D("frac_trk_btoc_bad", "Fraction of tracks per jet among badly reconstructed jets;Track fraction;Entries", 10, 0, 1)
+    hist_frac_trk_b_tot = TH1D("frac_trk_b_tot", ";Fraction of tracks per jet (all jets);Entries", 10, 0, 1)
+    hist_frac_trk_c_tot = TH1D("frac_trk_c_tot", ";Fraction of tracks per jet (all jets);Entries", 10, 0, 1)
+    hist_frac_trk_nohf_tot = TH1D("frac_trk_nohf_tot", ";Fraction of tracks per jet (all jets);Entries", 10, 0, 1)
+    hist_frac_trk_nm_tot = TH1D("frac_trk_nm_tot", ";Fraction of tracks per jet (all jets);Entries", 10, 0, 1)
+    hist_frac_trk_btoc_tot = TH1D("frac_trk_btoc_tot", ";Fraction of tracks per jet (all jets);Entries", 10, 0, 1)
+    hist_frac_trk_b_bad = TH1D("frac_trk_b_bad", ";Fraction of tracks per jet (badly reconstructed jets);Entries", 10, 0, 1)
+    hist_frac_trk_c_bad = TH1D("frac_trk_c_bad", ";Fraction of tracks per jet (badly reconstructed jets);Entries", 10, 0, 1)
+    hist_frac_trk_nohf_bad = TH1D("frac_trk_nohf_bad", ";Fraction of tracks per jet (badly reconstructed jets);Entries", 10, 0, 1)
+    hist_frac_trk_nm_bad = TH1D("frac_trk_nm_bad", ";Fraction of tracks per jet (badly reconstructed jets);Entries", 10, 0, 1)
+    hist_frac_trk_btoc_bad = TH1D("frac_trk_btoc_bad", ";Fraction of tracks per jet (badly reconstructed jets);Entries", 10, 0, 1)
 
     #edge score and recall histograms
     bin_edges = np.linspace(-0.05,1.05,12)
     if not multi_class:
-        pos_r_hist = TH1D("TPR", "Results for each jet;Rate;Fraction of jets",11,bin_edges) #1.001 is the upper bound so this is inclusive of 1
-        neg_r_hist = TH1D("TNR", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
-        edge_score_hist = TH1D("", "Edges scores;Score;Fraction of jets",11,bin_edges)
+        pos_r_hist = TH1D("TPR", ";Score;Fraction of jets",11,bin_edges) #1.001 is the upper bound so this is inclusive of 1
+        neg_r_hist = TH1D("TNR", ";Score;Fraction of jets",11,bin_edges)
+        edge_score_hist = TH1D("", ";Score;Fraction of jets",11,bin_edges)
         hist_r_list = [neg_r_hist, pos_r_hist] #TNR, TPR
         r_labels = ["TNR", "TPR"]
         hist_s_list = [edge_score_hist]
-        s_labels = []
+        s_labels = ["Edge score"]
     else:
-        neg_r_hist = TH1D("Class 0 recall", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
-        b_r_hist = TH1D("Class 1 recall", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
-        c_r_hist = TH1D("Class 2 recall", "Results for each jet;Rate;Fraction of jets",11,bin_edges)
-        neg_score_hist = TH1D("Class 0 scores", "Class scores;Score;Fraction of jets",11,bin_edges)
-        b_score_hist = TH1D("Class 1 scores", "Class scores;Score;Fraction of jets",11,bin_edges)
-        c_score_hist = TH1D("Class 2 scores", "Class scores;Score;Fraction of jets",11,bin_edges)
+        neg_r_hist = TH1D("Class 0 recall", ";Score;Fraction of jets",11,bin_edges)
+        b_r_hist = TH1D("Class 1 recall", ";Score;Fraction of jets",11,bin_edges)
+        c_r_hist = TH1D("Class 2 recall", ";Score;Fraction of jets",11,bin_edges)
+        neg_score_hist = TH1D("Class 0 scores", ";Score;Fraction of jets",11,bin_edges)
+        b_score_hist = TH1D("Class 1 scores", ";Score;Fraction of jets",11,bin_edges)
+        c_score_hist = TH1D("Class 2 scores", ";Score;Fraction of jets",11,bin_edges)
         hist_r_list = [neg_r_hist, b_r_hist, c_r_hist]
         r_labels = ["negative recall", "b recall", "c recall"]
         hist_s_list = [neg_score_hist, b_score_hist, c_score_hist]
@@ -308,22 +305,23 @@ def main(argv):
 
     base_filename = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
 
+    canv1 = TCanvas("c1", "c1", 800, 600)
     ext = ["_recall.png", "_score.png"]
     hist_list_list = [hist_r_list, hist_s_list]
     label_list_list = [r_labels, s_labels]
     for i in range(len(hist_list_list)):
-        plot_hist(hist_list_list[i], label_list_list[i], False, False, False, base_filename+ext[i], "NOSTACK")
-
-    plot_hist_diff([hist_trk_pt_b_tot, hist_trk_pt_c_tot, hist_trk_pt_btoc_tot], [hist_trk_pt_b_bad, hist_trk_pt_c_bad, hist_trk_pt_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_pt_comp.png", "HIST")
-    plot_hist_diff([hist_trk_theta_b_tot, hist_trk_theta_c_tot, hist_trk_theta_btoc_tot], [hist_trk_theta_b_bad, hist_trk_theta_c_bad, hist_trk_theta_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_theta_comp.png", "HIST")
-    plot_hist_diff([hist_trk_phi_b_tot, hist_trk_phi_c_tot, hist_trk_phi_btoc_tot], [hist_trk_phi_b_bad, hist_trk_phi_c_bad, hist_trk_phi_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_phi_comp.png", "HIST")
-    plot_hist_diff([hist_trk_d0_b_tot, hist_trk_d0_c_tot, hist_trk_d0_btoc_tot], [hist_trk_d0_b_bad, hist_trk_d0_c_bad, hist_trk_d0_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_d0_comp.png", "HIST")
-    plot_hist_diff([hist_trk_z0_b_tot, hist_trk_z0_c_tot, hist_trk_z0_btoc_tot], [hist_trk_z0_b_bad, hist_trk_z0_c_bad, hist_trk_z0_btoc_bad], ["bH", "prompt cH", "bH->cH"], True, base_filename+"_trk_z0_comp.png", "HIST")
-    plot_hist([hist_no_trk_jet_b_tot, hist_no_trk_jet_c_tot, hist_no_trk_jet_btoc_tot, hist_no_trk_jet_nohf_tot, hist_no_trk_jet_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_no_trk_tot.png", "HIST NOSTACK")
-    plot_hist([hist_frac_trk_b_tot, hist_frac_trk_c_tot, hist_frac_trk_btoc_tot, hist_frac_trk_nohf_tot, hist_frac_trk_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_frac_trk_tot.png", "HIST NOSTACK")
-    plot_hist([hist_no_trk_jet_b_bad, hist_no_trk_jet_c_bad, hist_no_trk_jet_btoc_bad, hist_no_trk_jet_nohf_bad, hist_no_trk_jet_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_no_trk_bad.png", "HIST NOSTACK")
-    plot_hist([hist_frac_trk_b_bad, hist_frac_trk_c_bad, hist_frac_trk_btoc_bad, hist_frac_trk_nohf_bad, hist_frac_trk_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], True, True, True, base_filename+"_frac_trk_bad.png", "HIST NOSTACK") 
-
+        plot_hist(canv1, hist_list_list[i], label_list_list[i], cut_string, True, True, base_filename+ext[i])
+    plot_hist(canv1, [hist_no_trk_jet_b_tot, hist_no_trk_jet_c_tot, hist_no_trk_jet_btoc_tot, hist_no_trk_jet_nohf_tot, hist_no_trk_jet_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], cut_string, True, True, base_filename+"_no_trk_tot.png")
+    plot_hist(canv1, [hist_frac_trk_b_tot, hist_frac_trk_c_tot, hist_frac_trk_btoc_tot, hist_frac_trk_nohf_tot, hist_frac_trk_nm_tot], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], cut_string, True, True, base_filename+"_frac_trk_tot.png")
+    plot_hist(canv1, [hist_no_trk_jet_b_bad, hist_no_trk_jet_c_bad, hist_no_trk_jet_btoc_bad, hist_no_trk_jet_nohf_bad, hist_no_trk_jet_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], cut_string, True, True, base_filename+"_no_trk_bad.png")
+    plot_hist(canv1, [hist_frac_trk_b_bad, hist_frac_trk_c_bad, hist_frac_trk_btoc_bad, hist_frac_trk_nohf_bad, hist_frac_trk_nm_bad], ["bH", "prompt cH", "bH->cH", "no HF", "no match"], cut_string, True, True, base_filename+"_frac_trk_bad.png") 
+    
+    canv2 = TCanvas("c2", "c2",200,10,900,900)
+    plot_histratio(canv2, [hist_trk_pt_b_bad, hist_trk_pt_c_bad, hist_trk_pt_btoc_bad], [hist_trk_pt_b_tot, hist_trk_pt_c_tot, hist_trk_pt_btoc_tot], ["bH", "prompt cH", "bH->cH"], cut_string, True, base_filename+"_trk_pt_comp.png")
+    plot_histratio(canv2, [hist_trk_theta_b_bad, hist_trk_theta_c_bad, hist_trk_theta_btoc_bad], [hist_trk_theta_b_tot, hist_trk_theta_c_tot, hist_trk_theta_btoc_tot], ["bH", "prompt cH", "bH->cH"], cut_string, True, base_filename+"_trk_theta_comp.png")
+    plot_histratio(canv2, [hist_trk_phi_b_bad, hist_trk_phi_c_bad, hist_trk_phi_btoc_bad], [hist_trk_phi_b_tot, hist_trk_phi_c_tot, hist_trk_phi_btoc_tot], ["bH", "prompt cH", "bH->cH"], cut_string, True, base_filename+"_trk_phi_comp.png")
+    plot_histratio(canv2, [hist_trk_d0_b_bad, hist_trk_d0_c_bad, hist_trk_d0_btoc_bad], [hist_trk_d0_b_tot, hist_trk_d0_c_tot, hist_trk_d0_btoc_tot], ["bH", "prompt cH", "bH->cH"], cut_string, True, base_filename+"_trk_d0_comp.png")
+    plot_histratio(canv2, [hist_trk_z0_b_bad, hist_trk_z0_c_bad, hist_trk_z0_btoc_bad], [hist_trk_z0_b_tot, hist_trk_z0_c_tot, hist_trk_z0_btoc_tot], ["bH", "prompt cH", "bH->cH"], cut_string, True, base_filename+"_trk_z0_comp.png")
 
 if __name__ == '__main__':
     main(sys.argv)
