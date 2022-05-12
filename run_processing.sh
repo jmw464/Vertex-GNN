@@ -8,7 +8,8 @@
 
 NTUPLES="user.jmwagner.27266826.Akt4EMPf_BTagging201903._000006 user.jmwagner.27266824.Akt4EMPf_BTagging201903._000006"
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh06_tt06_cut_v7
+DATANAME=btag_zh06_tt06_cut_v7_1
+OPTIONFILE=options
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
@@ -35,13 +36,13 @@ file_counter=0
 for NTUPLE in $NTUPLES
 do
 	printf "Running create_graphs.py to transform ${NTUPLE}.hdf5 into GNN compatible data\n\n"
-	python scripts/create_graphs.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR}${DATANAME}/ -e ${ENTRIES[$file_counter]} -d ${DATANAME}
+	#python scripts/create_graphs.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR}${DATANAME}/ -e ${ENTRIES[$file_counter]} -d ${DATANAME} -f ${OPTIONFILE}
 	printf "\n"
 	file_counter=$(expr $file_counter + 1)
 done
 
 printf "Running combine_graphs.py to combine individual files\n\n"
-python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES"
+python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES" -f ${OPTIONFILE}
 	
 if [[ $NORMED != 0 ]]
 then
@@ -51,7 +52,7 @@ then
 fi
 
 printf "Running plot_data.py to generate plots\n\n"
-python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME
+python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -f ${OPTIONFILE}
 
 printf "Running prune_graphs.py to remove cut tracks\n\n"
 python scripts/prune_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n $NORMED

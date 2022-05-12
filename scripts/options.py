@@ -21,6 +21,13 @@ incl_corr = True #include off-diagonal covariance matrix GNN features
 incl_hits = True #include GNN features related to low-level hit information
 incl_vweight = True #include vertex weight as GNN feature
 
+#list of features - GNN
+base_features = ['qoverp', 'theta', 'phi', 'd0', 'z0', 'jet pT', 'jet eta', 'jet phi']
+weight_features = ['vertex weight']
+error_features = ['var(qoverp)', 'var(theta)', 'var(phi)', 'var(d0)', 'var(z0)']
+corr_features = ['corr(qoverp, theta)', 'corr(qoverp, phi)', 'corr(qoverp, d0)', 'corr(qoverp, z0)', 'corr(theta, phi)', 'corr(theta, d0)', 'corr(theta, z0)', 'corr(phi, d0)', 'corr(phi, z0)', 'corr(d0, z0)']
+hit_features = ['pixhits', 'scthits', 'blhits', 'pixholes', 'sctholes', 'pixshared', 'sctshared', 'blshared', 'pixsplit', 'blsplit']
+
 #neural network options - GNN
 use_gpu = True #toggle whether to use GPU for GNN training if available
 load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
@@ -35,16 +42,21 @@ dropout = 0.1
 #neural network evaluation criteria - GNN
 mult_threshold = [0.5, 0.5, 0.5] #threshold for recall of jets to be marked as bad in multi class classification (none, b, c, b->c, other)
 bin_threshold = [0.5, 0.7] #threshold for recall of jets to be marked as bad in binary classiciation (False, True)
-score_threshold = 0.6 #threshold score for two edges to be associated to a reconstructed secondary vertex
+score_threshold = 0.8 #threshold score for two edges to be associated to a reconstructed secondary vertex
 
 #neural network model parameters - GNN
+model_type = 'gnn'
+gnn_type = 'gat'
 attention_heads = [2, 2] #number of attention heads in GAT layers
-nodemlp_sizes = [64, 64] #number of nodes in NodeMLP hidden layers
-gat_sizes = [256, 512] #layer sizes in GAT hidden layers (if attention_heads > 1, output sizes need to be multiplied by attention_heads for each layer)
-edgemlp_sizes = [1024, 256, 64] #excluding output features layer sizes in EdgeMLP hidden layers
+nodemlp_sizes = [128, 128] #number of nodes in NodeMLP hidden layers
+gat_sizes = [256, 512] #layer sizes in GAT hidden layers (divided by number of attention heads for each layer)
+edgemlp_sizes = [512, 256, 64] #excluding output features layer sizes in EdgeMLP hidden layers
 reweight = True #toggle whether positive labels in loss are reweighted to make positives and negatives equally important
-#ADD REWEIGHTING FACTOR FOR BINARY AND MULTI-CLASS
+reweight_bin = 0.5 #scale relative imporance of positives/negatives
+reweight_mult = [0.5, 0.5] #scale relative importance of b/negatives and c/negatives
 use_lr_scheduler = False #toggle whether to use learning rate schedule during training
+loss_a = 2
+loss_b = 0
 
 #truth definitions - PROCESSING, PLOTTING
 vertex_threshold = 0 #maximum distance for non HF tracks to be marked as part of the same vertex ("other" category)

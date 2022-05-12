@@ -35,7 +35,6 @@ from ROOT import gROOT, gStyle, TFile, TH1D, TLegend, TCanvas, TProfile, gPad, T
 
 from GNN_eval import *
 from plot_functions import *
-import options
 
 
 def main(argv):
@@ -48,6 +47,7 @@ def main(argv):
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
     parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     runnumber = args.runnumber
@@ -55,6 +55,9 @@ def main(argv):
     infile_path = args.data_dir
     outfile_path = args.output_dir
     norm = args.use_normed
+    option_file = args.option_file
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     batch_size = options.batch_size
@@ -149,8 +152,8 @@ def main(argv):
     gnn_pt_profile_fakep_b = TProfile("gnn_pt_fakep_b", ";pT [GeV];Fraction of tracks from truth SV not in reco SV (b-jets)",20,jet_pt_bound[0],jet_pt_bound[1])
     sv1_eta_profile_fakep_b = TProfile("sv1_eta_fakep_b", ";#eta;Fraction of tracks from truth SV not in reco SV (b-jets)",20,-jet_eta_bound,jet_eta_bound)
     gnn_eta_profile_fakep_b = TProfile("gnn_eta_fakep_b", ";#eta;Fraction of tracks from truth SV not in reco SV (b-jets)",20,-jet_eta_bound,jet_eta_bound)
-    hist_pc_list = [sv1_corrp_hist, gnn_corrp_hist]
-    hist_pf_list = [sv1_fakep_hist, gnn_fakep_hist]
+    hist_pc_list = [gnn_corrp_hist, sv1_corrp_hist]
+    hist_pf_list = [gnn_fakep_hist, sv1_fakep_hist]
 
     #algorithmic efficiency/fr histograms - efficiency is only evaluated for jets with exactly one true SV
     sv1_pt_profile_alg_eff_c = TProfile("sv1_pt_alg_eff_c", ";pT [GeV];Algorithmic efficiency (c-jets)",20,jet_pt_bound[0],jet_pt_bound[1])

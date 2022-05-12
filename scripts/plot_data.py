@@ -25,7 +25,6 @@ from ROOT import TH1D, TCanvas, gROOT, TProfile
 import numpy as np
 import argparse
 
-import options
 from plot_functions import *
 from truth_functions import *
 
@@ -42,13 +41,17 @@ def main(argv):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="data_name", help="name of dataset to create (without hdf5 extension)")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     data_path = args.data_dir
     data_name = args.data_name
+    option_file = args.option_file
 
     b_pdgids = wd_bm + wd_bb #defined in truth_functions.py
     c_pdgids = wd_cm + wd_cb
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     track_pt_bound = options.track_pt_bound

@@ -27,7 +27,6 @@ import argparse
 from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas, TTree
 
 from truth_functions import *
-import options
 
 
 def main(argv):
@@ -40,7 +39,7 @@ def main(argv):
     parser.add_argument("-i", "--input_dir", type=str, required=True, dest="infile_dir", help="name of input directory")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="outfile_dir", help="name of output directory")
     parser.add_argument("-e", "--max_events", type=int, default=0, dest="max_events", help="maximum number of events to process")
-    parser.add_argument("-f", "--events_per_file", type=int, default=10000, dest="events_per_file", help="number of events per output file")
+    parser.add_argument("-v", "--events_per_file", type=int, default=10000, dest="events_per_file", help="number of events per output file")
     args = parser.parse_args()
 
     ntuple = TFile(args.infile_dir+args.ntuple+".root")

@@ -22,8 +22,6 @@ import os,sys,math,glob,random,ROOT
 import numpy as np
 import argparse
 
-import options
-
 
 def prune_graph(graph):
     nodes_to_cut = []

@@ -23,8 +23,6 @@ import os,sys,math,glob,ROOT
 import numpy as np
 import argparse
 
-import options
-
 
 def main(argv):
 

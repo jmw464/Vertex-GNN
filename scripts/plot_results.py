@@ -21,7 +21,6 @@ from ROOT import TH1D, TCanvas
 import numpy as np
 import argparse
 
-import options
 from plot_functions import *
 from GNN_eval import *
 
@@ -40,12 +39,16 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     runnumber = args.runnumber
     infile_name = args.infile_name
     infile_path = args.data_dir
     outfile_path = args.output_dir
+    option_file = args.option_file
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     batch_size = options.batch_size
@@ -187,7 +190,7 @@ def main(argv):
             counter += 1
 
     #initialize overall bad events matrix
-    bad_events = np.empty((0,3), dtype=np.int)
+    bad_events = np.empty((0,3), dtype=int)
 
     #read in length of test file
     if os.path.isfile(paramfile_name):

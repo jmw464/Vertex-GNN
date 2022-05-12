@@ -15,7 +15,6 @@ from ROOT import TH1D, TCanvas, TProfile
 import numpy as np
 import argparse
 
-import options
 from plot_functions import *
 from GNN_eval import *
 
@@ -34,12 +33,16 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     runnumber = args.runnumber
     infile_name = args.infile_name
     infile_path = args.data_dir
     outfile_path = args.output_dir
+    option_file = args.option_file
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     batch_size = options.batch_size
@@ -113,15 +116,15 @@ def main(argv):
             hist_attn_b.append(TH1D("edg_attn"+str(i+1)+str(j+1)+"_b", ";#alpha_{"+str(i+1)+","+str(j+1)+"};Normalized count", 20, 0, 1))
             hist_attn_c.append(TH1D("edg_attn"+str(i+1)+str(j+1)+"_c", ";#alpha_{"+str(i+1)+","+str(j+1)+"};Normalized count", 20, 0, 1))
             hist_attn_none.append(TH1D("edg_attn"+str(i+1)+str(j+1)+"_none", ";#alpha_{"+str(i+1)+","+str(j+1)+"};Normalized count", 20, 0, 1))
-            profile_attn_pt_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_b", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, track_pt_bound[0]*2, track_pt_bound[1]*2))
-            profile_attn_pt_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_c", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, track_pt_bound[0]*2, track_pt_bound[1]*2))
-            profile_attn_pt_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_none", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, track_pt_bound[0]*2, track_pt_bound[1]*2))
-            profile_attn_z0_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_b", ";#delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_z0_bound))
-            profile_attn_z0_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_c", ";#delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_z0_bound))
-            profile_attn_z0_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_none", ";#delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_z0_bound))
-            profile_attn_d0_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_b", ";#delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_d0_bound))
-            profile_attn_d0_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_c", ";#delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_d0_bound))
-            profile_attn_d0_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_none", ";#delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 50, 0, track_d0_bound))
+            profile_attn_pt_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_b", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, track_pt_bound[0]*2, track_pt_bound[1]*2))
+            profile_attn_pt_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_c", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, track_pt_bound[0]*2, track_pt_bound[1]*2))
+            profile_attn_pt_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_pt_none", ";#Sigma pT;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, track_pt_bound[0]*2, track_pt_bound[1]*2))
+            profile_attn_z0_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_b", ";#Delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_z0_bound))
+            profile_attn_z0_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_c", ";#Delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_z0_bound))
+            profile_attn_z0_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_z0_none", ";#Delta z0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_z0_bound))
+            profile_attn_d0_b.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_b", ";#Delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_d0_bound))
+            profile_attn_d0_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_c", ";#Delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_d0_bound))
+            profile_attn_d0_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_none", ";#Delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_d0_bound))
 
     #read in normalization constants for features
     if os.path.isfile(normfile_name):
@@ -172,8 +175,8 @@ def main(argv):
                 dst_pt = abs(1/(features[dstnodes[i],0]*std_features[0]+mean_features[0]))
                 src_z0 = features[srcnodes[i],4]*std_features[4]+mean_features[4]
                 dst_z0 = features[dstnodes[i],4]*std_features[4]+mean_features[4]
-                src_d0 = features[srcnodes[i],4]*std_features[4]+mean_features[4]
-                dst_d0 = features[dstnodes[i],4]*std_features[4]+mean_features[4]
+                src_d0 = features[srcnodes[i],3]*std_features[3]+mean_features[3]
+                dst_d0 = features[dstnodes[i],3]*std_features[3]+mean_features[3]
 
                 c = 0
                 for j in range(nattn):

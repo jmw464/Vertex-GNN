@@ -25,7 +25,6 @@ from ROOT import gROOT, TFile, TH1D, TLorentzVector, TCanvas
 import matplotlib.pyplot as plt
 import time
 
-import options
 from truth_functions import *
 
 
@@ -56,9 +55,13 @@ def main(argv):
     parser.add_argument("-i", "--input_dir", type=str, required=True, dest="infile_dir", help="name of input directory")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="outfile_dir", help="name of output directory")
     parser.add_argument("-e", "--max_graphs", type=int, default=0, dest="max_graphs", help="maximum number of graphs to create")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     max_graphs = args.max_graphs
+    option_file = args.option_file
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #input data parameters
     connect_btoc = options.connect_btoc
@@ -180,6 +183,7 @@ def main(argv):
                 passed_cuts = np.zeros((ntracks,1))
                 bin_labels = np.zeros((nedges,1))
                 mult_labels = np.zeros((nedges,1))
+                sv01_labels = np.zeros((nedges,2))
                 
                 #read in features for each track
                 for j in range(ntracks):
@@ -281,6 +285,17 @@ def main(argv):
                         elif ((prev_b_ancestors[k] == hf_ancestors[j] and hf_ancestors[j] > 0) or (prev_b_ancestors[j] == hf_ancestors[k] and hf_ancestors[k] > 0)) and ((track_flavors[j] == 1 and track_flavors[k] == 3) or (track_flavors[j] == 3 and track_flavors[k] == 1)): #matching second ancestor and direct ancestor (B to B->C)
                             bin_labels[counter:counter+2] = connect_btoc
                             mult_labels[counter:counter+2] = connect_btoc
+
+                        #set SV1 edge labels
+                        if reco_use[j,0] > 0 and reco_use[k,0] > 0:
+                            sv01_labels[counter:counter+2,0] = 1
+                        else:
+                            sv01_labels[counter:counter+2,0] = 0
+                        if reco_use[j,1] > 0 and reco_use[k,1] > 0:
+                            sv01_labels[counter:counter+2,1] = 1
+                        else:
+                            sv01_labels[counter:counter+2,1] = 0
+
                         counter += 2
 
                 #create graph objects and append them to the list
@@ -298,6 +313,7 @@ def main(argv):
                     g.ndata['passed_cuts'] = th.from_numpy(passed_cuts)
                     g.edata['bin_labels'] = th.from_numpy(bin_labels)
                     g.edata['mult_labels'] = th.from_numpy(mult_labels)
+                    g.edata['sv01_labels'] = th.from_numpy(sv01_labels)
                     g_list.append(g)
                     tracks_kept += np.sum(passed_cuts == 1)
                     tracks_cut += np.sum(passed_cuts == 0)

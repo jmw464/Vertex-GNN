@@ -31,7 +31,6 @@ import matplotlib.pyplot as plt
 from GNN_model import *
 from GNN_eval import *
 from plot_functions import *
-import options
 
 #th.set_printoptions(edgeitems=10000)
 #np.set_printoptions(threshold=sys.maxsize)
@@ -50,6 +49,7 @@ def main(argv):
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
     parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
     parser.add_argument("-m", "--multiclass", type=int, default=0, dest="multi_class", help="choose whether to perform binary of multi-class classification")
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
     runnumber = args.runnumber
@@ -59,6 +59,9 @@ def main(argv):
     outfile_path = args.output_dir
     use_normed = args.use_normed
     multi_class = args.multi_class
+    option_file = args.option_file
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     use_gpu = options.learning_rate
@@ -69,9 +72,21 @@ def main(argv):
     nodemlp_sizes = options.nodemlp_sizes
     gat_sizes = options.gat_sizes
     edgemlp_sizes = options.edgemlp_sizes
-    reweight = options.reweight #reweight positive labels in loss to make positives and negatives equally important
+    reweight = options.reweight
+    reweight_bin = options.reweight_bin
+    reweight_mult = options.reweight_mult
     load_checkpoint = options.load_checkpoint
     use_lr_scheduler = options.use_lr_scheduler
+    loss_a = options.loss_a
+    loss_b = options.loss_b
+    base_features = options.base_features
+    weight_features = options.weight_features
+    error_features = options.error_features
+    corr_features = options.corr_features
+    hit_features = options.hit_features
+    score_threshold = options.score_threshold
+    model_type = options.model_type
+    gnn_type = options.gnn_type
 
     #---------------------------------------------------DATA-IMPORT-------------------------------------------------
 
@@ -94,23 +109,28 @@ def main(argv):
     incl_errors = incl_corr = incl_hits = incl_vweight = False
     nnfeatures_base = sample_graph.ndata['features_base'].size()[1]
     in_features = nnfeatures_base
+    feature_list = base_features
     if 'features_vweight' in sample_graph.ndata.keys():
         nnfeatures_vweight = sample_graph.ndata['features_vweight'].size()[1]
         incl_vweight = True
         in_features += nnfeatures_vweight
+        feature_list += weight_features
     if 'features_errors' in sample_graph.ndata.keys():
         nnfeatures_errors = sample_graph.ndata['features_errors'].size()[1]
         incl_errors = True
         in_features += nnfeatures_errors
+        feature_list += error_features
     if 'features_hits' in sample_graph.ndata.keys():
         nnfeatures_hits = sample_graph.ndata['features_hits'].size()[1]
         incl_hits = True
         in_features += nnfeatures_hits
+        feature_list += hit_features
     if 'features_corr' in sample_graph.ndata.keys():
         nnfeatures_corr = sample_graph.ndata['features_corr'].size()[1]
         incl_corr = True
         in_features += nnfeatures_corr
-    
+        feature_list += corr_features
+
     #read in values from parameter file
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
@@ -129,8 +149,8 @@ def main(argv):
 
     #reweight positive labels automatically if desired
     if reweight:
-        pos_weight = th.tensor([0.5*(1-truth_frac)/truth_frac])
-        mult_weights = th.tensor([1./(1-b_frac-c_frac), 1./b_frac, 1./c_frac])
+        pos_weight = th.tensor([reweight_bin*(1-truth_frac)/truth_frac])
+        mult_weights = th.tensor([1./(1-reweight_mult[0]/b_frac-reweight_mult[0]/c_frac), reweight_mult[0]/b_frac, reweight_mult[1]/c_frac])
         print("Setting positive weight to {}".format(pos_weight), flush=True)
     else:
         pos_weight = th.tensor([1])
@@ -141,32 +161,29 @@ def main(argv):
     val_batches = int(math.ceil(val_len/batch_size))
     train_batches = int(math.ceil(train_len/batch_size))
 
+    if th.cuda.is_available() and use_gpu:
+        device = th.device('cuda')
+        print("Found {} GPUs".format(th.cuda.device_count()))
+    else:
+        device = th.device('cpu')
+
     #set up loss
     if not multi_class:
-        loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum')
+        loss = lambda x, y, z: bin_loss(x, y, z, pos_weight, loss_a, loss_b, device) #nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum')
         outfeats = 1
         cm = np.zeros((2,2),dtype=int)
         activation = nn.Sigmoid()
         labeltype = 'bin_labels'
     else:
-        loss = nn.CrossEntropyLoss(weight=mult_weights).double()
+        loss = nn.CrossEntropyLoss(weight=mult_weights).double().to(device)
         outfeats = 3
         cm = np.zeros((3,3),dtype=int)
         activation = nn.Softmax(dim=1)
         labeltype = 'mult_labels'
 
-    model = EdgePredModel(nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads, dropout).double()
-    
-    if th.cuda.is_available() and use_gpu:
-        device = th.device('cuda')
-        print("Found {} GPUs".format(th.cuda.device_count()))
-        #if th.cuda.device_count() > 1: model = th.nn.DataParallel(model)
-    else:
-        device = th.device('cpu')
-    model.to(device)
-    loss.to(device)
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu') #automatically run on GPU if available
+    sv1_cm = np.zeros((2,2),dtype=int)
 
+    model = EdgePredModel(model_type, gnn_type, nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads, dropout).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
         
@@ -181,7 +198,7 @@ def main(argv):
 
     #load existing checkpoint
     if load_checkpoint and os.path.exists(checkpointfile_name):
-        checkpoint = th.load(checkpointfile_name)
+        checkpoint = th.load(checkpointfile_name, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         opt.load_state_dict(checkpoint['optimizer_state_dict'])
         start_epoch = checkpoint['epoch']+1
@@ -222,13 +239,18 @@ def main(argv):
             if incl_hits: features = th.cat((features, batch.ndata['features_hits']),dim=1)
             if incl_corr: features = th.cat((features, batch.ndata['features_corr']),dim=1)
 
+            n_batch_edges = batch.batch_num_edges()
+
             #process batch
             batch = batch.to(device) #transfer batch to relevant device
             features = features.to(device)
             pred = model(batch, features)
             target = batch.edata[labeltype]
-            if multi_class: target = target[:,0].long()
-            pred_lt = loss(pred, target)
+            if multi_class:
+                target = target[:,0].long()
+                pred_lt = loss(pred, target)
+            else:
+                pred_lt = loss(pred, target, n_batch_edges)
 
             opt.zero_grad()
             pred_lt.backward()
@@ -268,13 +290,18 @@ def main(argv):
             if incl_hits: val_features = th.cat((val_features, val_batch.ndata['features_hits']),dim=1)
             if incl_corr: val_features = th.cat((val_features, val_batch.ndata['features_corr']),dim=1)
 
+            n_batch_edges = val_batch.batch_num_edges()
+
             #process batch
             val_batch = val_batch.to(device)
             val_features = val_features.to(device)
             pred = model(val_batch, val_features)
             target = val_batch.edata[labeltype]
-            if multi_class: target = target[:,0].long()
-            pred_lv = loss(pred, target)
+            if multi_class:
+                target = target[:,0].long()
+                pred_lv = loss(pred, target)
+            else:
+                pred_lv = loss(pred, target, n_batch_edges)
 
             #evaluate loss
             batch_labels = val_batch.edata['bin_labels'].size()[0]
@@ -296,6 +323,7 @@ def main(argv):
     overall_g_list = []
 
     #testing
+    if not multi_class: print("Score threshold = {}".format(score_threshold))
     with th.no_grad():
         model.eval()
         for ibatch in range(test_batches):
@@ -315,6 +343,8 @@ def main(argv):
             if incl_hits: test_features = th.cat((test_features, test_batch.ndata['features_hits']),dim=1)
             if incl_corr: test_features = th.cat((test_features, test_batch.ndata['features_corr']),dim=1)
 
+            n_batch_edges = test_batch.batch_num_edges()
+
             #process batch
             test_batch = test_batch.to(device)
             test_features = test_features.to(device)
@@ -322,20 +352,24 @@ def main(argv):
         
             #evaluate results
             pred = activation(model(test_batch, test_features).float()).cpu().detach().numpy()
-            true = test_batch.edata[labeltype].cpu().numpy().astype(int) 
-        
+            true = test_batch.edata[labeltype].cpu().numpy().astype(int)
+            sv1_pred = test_batch.edata['sv01_labels'][:,1].cpu().numpy().astype(int)
+
             test_batch.edata['pred'] = activation(test_batch.edata['pred'])
 
             g_test_list = dgl.unbatch(test_batch)
             overall_g_list.extend(g_test_list)
 
             if not multi_class:
-                cm += evaluate_confusion_bin(true, pred.round().astype(int))
+                cm += evaluate_confusion_bin(true[:,0], (pred[:,0] > score_threshold).astype(int))
             else:
-                cm += evaluate_confusion_mult(true, pred.round().astype(int))
+                cm += evaluate_confusion_mult(true[:,0], pred.round().astype(int))
+            sv1_cm += evaluate_confusion_bin(true[:,0], sv1_pred)
 
     #print test results
-    print_output(multi_class, cm)
+    print_output(multi_class, cm, 'GNN')
+    print_output(False, sv1_cm, 'SV1')
+    print_weight_contribution(model, feature_list)
 
     #save results to file
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber

@@ -28,6 +28,7 @@ def plot_hist(canv, hist_list, labellist, cutstring, norm, log, filename, scalin
     canv.SetGrid()
     SetAtlasStyle()
     gStyle.SetOptStat(0)
+    gStyle.SetErrorX(0.5)
     pad1 = TPad("pad1", "pad1", 0.,0.,1.,1.)
     if log: pad1.SetLogy()
     if len(scaling) > 1 and scaling[1] == 0: scaling = []
@@ -100,6 +101,7 @@ def plot_hist(canv, hist_list, labellist, cutstring, norm, log, filename, scalin
 def plot_histratio(canv, hist_list, div_list, labellist, cutstring, log, filename):
     canv.Clear()
     gStyle.SetOptStat(0)
+    gStyle.SetErrorX(0.5)
     SetAtlasStyle()
     pad1 = TPad("pad1", "pad1", 0.05,0.35,1.0,1.0)
     pad1.SetGrid()
@@ -113,7 +115,7 @@ def plot_histratio(canv, hist_list, div_list, labellist, cutstring, log, filenam
     pad2.SetBottomMargin(0.25)
 
     pad1.cd()
-    legend = TLegend(0.75-0.15*(math.ceil(len(hist_list)/3)-1),0.76,0.9,0.92,'','NDC')
+    legend = TLegend(0.75-0.2*(math.ceil(len(hist_list)/3)-1),0.76,0.9,0.92,'','NDC')
     legend.SetNColumns(math.ceil(len(hist_list)/3))
     logo = TLatex(0.2,0.88, "#bf{#it{ATLAS}} #it{Internal}")
     add_text = TLatex(0.2,0.83,cutstring)
@@ -204,6 +206,7 @@ def plot_bar(canv, hist_list, axislabels, labels, cutstring, norm, log, filename
     canv.SetGrid()
     SetAtlasStyle()
     gStyle.SetOptStat(0)
+    gStyle.SetErrorX(0.5)
     pad1 = TPad("pad1", "pad1", 0.,0.,1.,1.)
     if log: pad1.SetLogy()
     pad1.SetTopMargin(0.1)
@@ -272,6 +275,7 @@ def plot_profile(canv, profile_list, labellist, cutstring, filename):
     canv.SetGrid()
     SetAtlasStyle()
     gStyle.SetOptStat(0)
+    gStyle.SetErrorX(0.5)
     pad1 = TPad("pad1", "pad1", 0.,0.,1.,1.)
     pad1.SetTopMargin(0.1)
     pad1.Draw()

@@ -18,10 +18,10 @@ import dgl
 def evaluate_confusion_bin(true, pred):
 
     cm = np.zeros((2,2),dtype=int)
-    cm[1,1] = np.sum((true[:,0] == 1) & (pred[:,0] == 1)) #true positive - actually true, marked as true
-    cm[0,0] = np.sum((true[:,0] == 0) & (pred[:,0] == 0)) #true negative - actually false, marked as false
-    cm[0,1] = np.sum((true[:,0] == 0) & (pred[:,0] == 1)) #false positive - actually false, marked as true
-    cm[1,0] = np.sum((true[:,0] == 1) & (pred[:,0] == 0)) #false negative - actually true, marked as false
+    cm[1,1] = np.sum((true == 1) & (pred == 1)) #true positive - actually true, marked as true
+    cm[0,0] = np.sum((true == 0) & (pred == 0)) #true negative - actually false, marked as false
+    cm[0,1] = np.sum((true == 0) & (pred == 1)) #false positive - actually false, marked as true
+    cm[1,0] = np.sum((true == 1) & (pred == 0)) #false negative - actually true, marked as false
     
     return cm
 
@@ -32,7 +32,7 @@ def evaluate_confusion_mult(true, pred):
     cm = np.zeros((3,3),dtype=int)
     for i in range(3):
         for j in range(3):
-            cm[i,j] = np.sum((true[:,0] == i) & (pred[:] == j))
+            cm[i,j] = np.sum((true == i) & (pred == j))
     
     return cm
 
@@ -199,9 +199,9 @@ def associate_vertices(vertex_metrics, mode):
 
 
 #print confusion matrix and other GNN evaluation metrics
-def print_output(multi_class, cm):
+def print_output(multi_class, cm, label):
     if not multi_class:
-        print('\nTesting results:')
+        print(label+' results:')
         print('             ||  Pred False  |  Pred True   |')
         print('---------------------------------------------')
         print(f'Actual False || {cm[0,0]:12} | {cm[0,1]:12} |')
@@ -213,7 +213,7 @@ def print_output(multi_class, cm):
         print('True Negative Rate: {:.4f}'.format(cm[0,0]/(cm[0,0]+cm[0,1]))) #tn/(tn+fp)
         print('F1 Score {:.4f}\n'.format(2*cm[1,1]/(2*cm[1,1]+cm[0,1]+cm[1,0]))) #2*tp/(2*tp+fp+fn)
     else:
-        print('\nTesting results:')
+        print(label+' results:')
         print('       ||    Pred 0    |    Pred 1    |    Pred 2    ||  Recall ')
         print('----------------------------------------------------------------------------------------------')
         print(f'True 0 || {cm[0,0]:12d} | {cm[0,1]:12d} | {cm[0,2]:12d} || {cm[0,0]/(cm[0,0]+cm[0,1]+cm[0,2]):.4f}')
@@ -221,3 +221,28 @@ def print_output(multi_class, cm):
         print(f'True 2 || {cm[2,0]:12d} | {cm[2,1]:12d} | {cm[2,2]:12d} || {cm[2,2]/(cm[2,0]+cm[2,1]+cm[2,2]):.4f}')
         print('----------------------------------------------------------------------------------------------')
         print(f'Prec   ||       {cm[0,0]/(cm[0,0]+cm[1,0]+cm[2,0]):.4f} |       {cm[1,1]/(cm[0,1]+cm[1,1]+cm[2,1]):.4f} |       {cm[2,2]/(cm[0,2]+cm[1,2]+cm[2,2]):.4f} ||\n')
+
+
+def print_weight_contribution(model, feature_list):
+    separate_srcdst = True
+    gnnweights = mlpweights = None
+    for name, param in model.named_parameters():
+        if name == "gcn.conv1.fc.weight":
+            gnnweights = th.sum(th.abs(model.gcn.conv1.fc.weight), 0)/model.gcn.conv1.fc.weight.shape[0]
+        elif name == "gcn.conv1.weight":
+            gnnweights = th.sum(th.abs(model.gcn.conv1.weight), 0)/model.gcn.conv1.weight.shape[0]
+        elif name == "gcn.conv1.fc_src.weight":
+            gnnweights = th.sum((th.abs(model.gcn.conv1.fc_src.weight) + th.abs(model.gcn.conv1.fc_dst.weight)), 0)/(2*model.gcn.conv1.fc_src.weight.shape[0])
+        elif name == "nodemlp.lin.0.weight":
+            mlpweights = th.sum(th.abs(model.nodemlp.lin[0].weight), 0)/model.nodemlp.lin[0].weight.shape[0]
+    
+    print("Printing average of absolute value of weights associated with each feature in first network layer:")
+    if gnnweights != None and mlpweights != None:
+        for i,feature in enumerate(feature_list):
+            print(feature+": {} (NodeMLP), {} (GraphNN)".format(mlpweights[i], gnnweights[i]))
+    elif gnnweights != None:
+        for i,feature in enumerate(feature_list):
+            print(feature+": {} (GraphNN)".format(gnnweights[i]))
+    elif mlpweights != None:
+        for i,feature in enumerate(feature_list):
+            print(feature+": {} (NodeMLP)".format(mlpweights[i]))

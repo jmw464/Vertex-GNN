@@ -19,8 +19,6 @@ import os,sys,math,glob,random,ROOT
 import numpy as np
 import argparse
 
-import options
-
 
 def main(argv):
 
@@ -29,13 +27,17 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="data_name", help="name of dataset to create (without hdf5 extension)")
     parser.add_argument("-n", "--ntuples", type=str, required=True, dest="ntuples", help="names of ntuples to combine")   
+    parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
 
     args = parser.parse_args()
 
     data_path = args.data_dir
     data_name = args.data_name
+    option_file = args.option_file
     ntuples = args.ntuples.split()
     ntuples.sort()
+
+    options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
     valp = options.valp

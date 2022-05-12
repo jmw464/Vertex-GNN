@@ -13,6 +13,6 @@ printf "##########BEGINNING PROCESSING##########\n\n"
 for NTUPLE in $NTUPLES
 do
 	printf "Running process_ntuple.py to create ${NTUPLE}.hdf5\n"
-	python scripts/process_ntuple.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR} -e ${ENTRIES}
+	python scripts/process_ntuple.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR} -v ${ENTRIES}
 	printf "\n"
 done
