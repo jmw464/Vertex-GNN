@@ -115,7 +115,7 @@ def plot_histratio(canv, hist_list, div_list, labellist, cutstring, log, filenam
     pad2.SetBottomMargin(0.25)
 
     pad1.cd()
-    legend = TLegend(0.75-0.2*(math.ceil(len(hist_list)/3)-1),0.76,0.9,0.92,'','NDC')
+    legend = TLegend(0.75-0.2*(math.ceil(len(hist_list)/3)-1),0.68,0.9,0.92,'','NDC')
     legend.SetNColumns(math.ceil(len(hist_list)/3))
     logo = TLatex(0.2,0.88, "#bf{#it{ATLAS}} #it{Internal}")
     add_text = TLatex(0.2,0.83,cutstring)
@@ -347,8 +347,8 @@ def plot_profileratio(canv, profile_list, div_list, profile_labels, div_labels, 
     #generate ratio histograms
     ratio_list = [None]*len(profile_list)
     for i in range(len(profile_list)):
-        ratio_list[i] = profile_list[i].Clone(profile_list[i].GetName()+"_ratio")
-        ratio_list[i].Divide(div_list[i])
+        ratio_list[i] = profile_list[i].Clone(profile_list[i].GetName()+"_ratio").ProjectionX()
+        ratio_list[i].Divide(div_list[i].ProjectionX())
 
     maximum = max([profile.GetMaximum() for profile in profile_list])
     minimum = min([profile.GetMinimum(0.) for profile in profile_list])

@@ -45,18 +45,18 @@ bin_threshold = [0.5, 0.7] #threshold for recall of jets to be marked as bad in 
 score_threshold = 0.8 #threshold score for two edges to be associated to a reconstructed secondary vertex
 
 #neural network model parameters - GNN
-model_type = 'gnn'
-gnn_type = 'gat'
+model_type = 'par' #choose model type - either 'mlp', 'gnn', 'par' or 'seq' (the latter two apply both, but either in parallel or in sequence)
+gnn_type = 'gat' #choose gnn layer type - either 'gat' or 'gcn'
 attention_heads = [2, 2] #number of attention heads in GAT layers
 nodemlp_sizes = [128, 128] #number of nodes in NodeMLP hidden layers
-gat_sizes = [256, 512] #layer sizes in GAT hidden layers (divided by number of attention heads for each layer)
+gat_sizes = [512, 512] #layer sizes in GAT hidden layers (divided by number of attention heads for each layer)
 edgemlp_sizes = [512, 256, 64] #excluding output features layer sizes in EdgeMLP hidden layers
 reweight = True #toggle whether positive labels in loss are reweighted to make positives and negatives equally important
 reweight_bin = 0.5 #scale relative imporance of positives/negatives
 reweight_mult = [0.5, 0.5] #scale relative importance of b/negatives and c/negatives
 use_lr_scheduler = False #toggle whether to use learning rate schedule during training
 loss_a = 2
-loss_b = 0
+loss_b = 1
 
 #truth definitions - PROCESSING, PLOTTING
 vertex_threshold = 0 #maximum distance for non HF tracks to be marked as part of the same vertex ("other" category)

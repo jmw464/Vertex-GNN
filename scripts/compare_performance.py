@@ -434,7 +434,7 @@ def main(argv):
     plot_profileratio(canv1, [gnn_eta_profile_fakep_b], [sv1_eta_profile_fakep_b], ["GNN"], ["SV1"], cut_string, False, True, outfile_name+"_fakep_eta_b.png")
 
     canv2 = TCanvas("c2", "c2", 800, 600) 
-    plot_bar(canv2, [gnn_trk_assoc_hist_fake, gnn_trk_assoc_hist_true], trk_flavor_labels, ["Associated with fake vertex", "Misassociated to true vertex"], cut_string, False, True, outfile_name+"_trk_assoc_false.png")
+    plot_bar(canv2, [gnn_trk_assoc_hist_fake, gnn_trk_assoc_hist_true], trk_flavor_labels, ["Assoc w fake", "Misassoc w true"], cut_string, False, True, outfile_name+"_trk_assoc_false.png")
 
     ext = ["_corrp.png", "_fakep.png"]
     hist_list_list = [hist_pc_list, hist_pf_list]

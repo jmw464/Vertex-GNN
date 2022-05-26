@@ -69,6 +69,7 @@ def main(argv):
     jinfo['jet_no'] = []
     jinfo['ntracks'] = []
     jinfo['jet_flavor'] = []
+    jinfo['jvt'] = []
 
     #jet features
     jfeatures = dict()
@@ -269,6 +270,7 @@ def main(argv):
                 jinfo['jet_no'].append(i)
                 jinfo['ntracks'].append(ntracks)
                 jinfo['jet_flavor'].append(jet_flavor)
+                jinfo['jvt'].append(entry.jet_JVT[i])
 
                 jfeatures['pt'].append(entry.jet_pt[i]/1000.) #convert from MeV to GeV
                 jfeatures['eta'].append(entry.jet_eta[i])

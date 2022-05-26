@@ -58,12 +58,14 @@ class GATConv(nn.Module):
 
     def __init__(self, gnn_size, in_features, attn_heads, dropout):
         super(GATConv, self).__init__()
+        self.norm = th.nn.BatchNorm1d(in_features)
         self.conv1 = dglnn.GATv2Conv(in_features, int(gnn_size[0]/attn_heads[0]), attn_heads[0], feat_drop=dropout, attn_drop=dropout, activation=nn.functional.relu)
         #self.conv2 = dglnn.GATv2Conv(gnn_size[0], int(gnn_size[1]/attn_heads[1]), attn_heads[1], feat_drop=dropout, attn_drop=dropout, activation=nn.functional.relu)
 
     def forward(self, g, x):
         # inputs are features of nodes
-        h, a1 = self.conv1(g, x, get_attention=True)
+        #h = self.norm(x)
+        h, a1 = self.conv1(g, h, get_attention=True)
         g.edata['attn1'] = a1
         h = h.view(*h.shape[:-2], h.shape[-1]*h.shape[-2])
         #h, a2 = self.conv2(g, h, get_attention=True)
@@ -78,12 +80,14 @@ class NodeMLP(nn.Module):
         super().__init__()
         self.lin = nn.ModuleList()
         self.dropout = nn.Dropout(p=dropout)
+        self.norm = th.nn.BatchNorm1d(in_features)
         layer_sizes = [in_features]
         layer_sizes.extend(nodemlp_size)
         for i in range(len(layer_sizes)-1):
             self.lin.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
 
-    def forward(self, h):
+    def forward(self, x):
+        #h = self.norm(x) 
         for layer in self.lin:
             h = F.relu(self.dropout(layer(h)))
         return h
@@ -162,21 +166,26 @@ class EdgePredModel(nn.Module):
     def __init__(self, model_type, gnn_type, nodemlp_size, gnn_size, edgemlp_size, in_features, out_features, attn_heads, dropout):
         super().__init__()
         self.model_type = model_type
-        if self.model_type == 'mlp' or self.model_type == 'both':
+        if self.model_type == 'mlp' or self.model_type == 'par':
             self.nodemlp = NodeMLP(nodemlp_size, in_features, dropout)
-        if self.model_type == 'gnn' or self.model_type == 'both':
+        if self.model_type == 'gnn' or self.model_type == 'par':
             if gnn_type == 'gcn': self.gcn = GCNConv(gnn_size, in_features)
             elif gnn_type == 'gat': self.gcn = GATConv(gnn_size, in_features, attn_heads, dropout)
+        if self.model_type == 'seq':
+            self.nodemlp = NodeMLP(nodemlp_size, in_features, dropout)
+            if gnn_type == 'gcn': self.gcn = GCNConv(gnn_size, nodemlp_size[-1])
+            elif gnn_type == 'gat': self.gcn = GATConv(gnn_size, nodemlp_size[-1], attn_heads, dropout)
 
-        if self.model_type == 'both':
+        if self.model_type == 'par':
             self.edgemlp = EdgeMLP(edgemlp_size, 2*(gnn_size[-1]+nodemlp_size[-1]), out_features, dropout)
         elif self.model_type == 'mlp':
             self.edgemlp = EdgeMLP_alt(edgemlp_size, 2*nodemlp_size[-1], out_features, dropout)
-        elif self.model_type == 'gnn':
+        elif self.model_type == 'gnn' or self.model_type == 'seq':
             self.edgemlp = EdgeMLP_alt(edgemlp_size, 2*gnn_size[-1], out_features, dropout)
 
+
     def forward(self, g, x):
-        if self.model_type == 'both':
+        if self.model_type == 'par':
             h1 = self.nodemlp(x)
             h2 = self.gcn(g, x)
             h = self.edgemlp(g, h1, h2)
@@ -185,6 +194,10 @@ class EdgePredModel(nn.Module):
             h = self.edgemlp(g, h)
         elif self.model_type == 'gnn':
             h = self.gcn(g, x)
+            h = self.edgemlp(g, h)
+        elif self.model_type == 'seq':
+            h = self.nodemlp(x)
+            h = self.gcn(g, h)
             h = self.edgemlp(g, h)
         g.edata['pred'] = h #still needs to be passed through an activation function
         return h

@@ -142,6 +142,7 @@ def main(argv):
 
             current_jet = infile['jinfo']['jet_no'][ientry]
             ntracks =  infile['jinfo']['ntracks'][ientry]
+            jet_jvt = infile['jinfo']['jvt'][ientry]
             pv_x = infile['efeatures']['pv_x'][event_index]
             pv_y = infile['efeatures']['pv_y'][event_index]
             pv_z = infile['efeatures']['pv_z'][event_index]
@@ -151,7 +152,8 @@ def main(argv):
             nedges = ntracks*(ntracks-1)
 
             #apply jet cuts
-            if jet_pt > jet_pt_cut and abs(jet_eta) < jet_eta_cut:
+            jet_jvt_cut = jet_jvt > 0.5 or jet_pt > 60 or abs(jet_eta) > 2.4 #tight WP
+            if jet_pt > jet_pt_cut and abs(jet_eta) < jet_eta_cut and jet_jvt_cut:
 
                 #make jet flavor label definitions consistent
                 jet_flavor = infile['jinfo']['jet_flavor'][ientry]

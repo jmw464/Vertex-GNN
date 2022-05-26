@@ -10,17 +10,17 @@
 #SBATCH -G 1
 #SBATCH -C gpu
 
-RUN=30 #run number - used to distinguish output
+RUN=32 #run number - used to distinguish output
 DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
 OUTPUTDIR=/global/homes/j/jmw464/ATLAS/Vertex-GNN/output/
 DATANAME=btag_zh06_tt06_cut_v7_1 #btag_ttbar_05_cut_v5 #btag_zhllcc_07_cut_v5
-OPTIONFILE=options30
+OPTIONFILE=options28
 
 ENVNAME=test #name of conda environment that contains packages
 
-EPOCHS=50
+EPOCHS=30
 
-NORMED=1
+NORMED=0
 MULTICLASS=0
 
 #create output directory if not already there
@@ -32,13 +32,13 @@ fi
 source activate $ENVNAME
 
 printf "##########BEGINNING TRAINING##########\n"
-python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS -f ${OPTIONFILE} | tee ${OUTPUTDIR}${RUN}/${DATANAME}_results.txt
+python scripts/GNN_main.py -r $RUN -e $EPOCHS -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -m $MULTICLASS -f options/${OPTIONFILE} | tee ${OUTPUTDIR}${RUN}/${DATANAME}_results.txt
 
 printf "##########PLOTTING RESULTS##########\n"
-python scripts/plot_results.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -f ${OPTIONFILE}
-python scripts/visualize_attention.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -f ${OPTIONFILE}
+python scripts/plot_results.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -f options/${OPTIONFILE}
+python scripts/visualize_attention.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -f options/${OPTIONFILE}
 
 if [[ $MULTICLASS == 0 ]]
 then
-	python scripts/compare_performance.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -f ${OPTIONFILE} | tee ${OUTPUTDIR}${RUN}/${DATANAME}_comparisons.txt
+	python scripts/compare_performance.py -r $RUN -s $DATANAME -d ${DATADIR}${DATANAME}/ -o $OUTPUTDIR -n $NORMED -f options/${OPTIONFILE} | tee ${OUTPUTDIR}${RUN}/${DATANAME}_comparisons.txt
 fi

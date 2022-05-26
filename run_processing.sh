@@ -15,7 +15,7 @@ ENVNAME=dgl-env #name of conda environment that contains packages
 
 ENTRIES=( 300000 300000 ) #jets used per file (after cuts)
 
-NORMED=1
+NORMED=0
 
 #create output directory if not already there
 if [ ! -d ${DATADIR}${DATANAME}/ ]
@@ -36,13 +36,13 @@ file_counter=0
 for NTUPLE in $NTUPLES
 do
 	printf "Running create_graphs.py to transform ${NTUPLE}.hdf5 into GNN compatible data\n\n"
-	#python scripts/create_graphs.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR}${DATANAME}/ -e ${ENTRIES[$file_counter]} -d ${DATANAME} -f ${OPTIONFILE}
+	#python scripts/create_graphs.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR}${DATANAME}/ -e ${ENTRIES[$file_counter]} -d ${DATANAME} -f options/${OPTIONFILE}
 	printf "\n"
 	file_counter=$(expr $file_counter + 1)
 done
 
 printf "Running combine_graphs.py to combine individual files\n\n"
-python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES" -f ${OPTIONFILE}
+#python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES" -f options/${OPTIONFILE}
 	
 if [[ $NORMED != 0 ]]
 then
@@ -52,7 +52,7 @@ then
 fi
 
 printf "Running plot_data.py to generate plots\n\n"
-python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -f ${OPTIONFILE}
+#python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -f options/${OPTIONFILE}
 
 printf "Running prune_graphs.py to remove cut tracks\n\n"
 python scripts/prune_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n $NORMED
