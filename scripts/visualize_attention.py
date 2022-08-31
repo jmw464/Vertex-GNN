@@ -59,7 +59,6 @@ def main(argv):
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
-    normfile_name = infile_path+infile_name+"_norm"
 
     #calculate number of features in graphs
     sample_graph = (dgl.load_graphs(graphfile_name, [0]))[0][0]
@@ -126,20 +125,6 @@ def main(argv):
             profile_attn_d0_c.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_c", ";#Delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_d0_bound))
             profile_attn_d0_none.append(TProfile("edg_attn"+str(i+1)+str(j+1)+"_d0_none", ";#Delta d0;Average #alpha_{"+str(i+1)+","+str(j+1)+"};", 20, 0, track_d0_bound))
 
-    #read in normalization constants for features
-    if os.path.isfile(normfile_name):
-        normfile = open(normfile_name, "r")
-        mean_features = np.zeros(nnfeatures)
-        std_features = np.zeros(nnfeatures) 
-        
-        counter = 0
-        for line in normfile:
-            if int(counter%2) == 0:
-                mean_features[int(counter/2)] = float(line)
-            else:
-                std_features[int((counter-1)/2)] = float(line)
-            counter += 1
-
     #read in length of test file
     if os.path.isfile(paramfile_name):
         paramfile = open(paramfile_name, "r")
@@ -171,12 +156,12 @@ def main(argv):
             srcnodes, dstnodes = g.edges()
 
             for i in range(pred.shape[0]):
-                src_pt = abs(1/(features[srcnodes[i],0]*std_features[0]+mean_features[0]))
-                dst_pt = abs(1/(features[dstnodes[i],0]*std_features[0]+mean_features[0]))
-                src_z0 = features[srcnodes[i],4]*std_features[4]+mean_features[4]
-                dst_z0 = features[dstnodes[i],4]*std_features[4]+mean_features[4]
-                src_d0 = features[srcnodes[i],3]*std_features[3]+mean_features[3]
-                dst_d0 = features[dstnodes[i],3]*std_features[3]+mean_features[3]
+                src_pt = abs(1/features[srcnodes[i],0])
+                dst_pt = abs(1/features[dstnodes[i],0])
+                src_z0 = features[srcnodes[i],4]
+                dst_z0 = features[dstnodes[i],4]
+                src_d0 = features[srcnodes[i],3]
+                dst_d0 = features[dstnodes[i],3]
 
                 c = 0
                 for j in range(nattn):

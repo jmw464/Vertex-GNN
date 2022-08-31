@@ -46,7 +46,6 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
-    parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
     parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
 
@@ -54,7 +53,6 @@ def main(argv):
     infile_name = args.infile_name
     infile_path = args.data_dir
     outfile_path = args.output_dir
-    norm = args.use_normed
     option_file = args.option_file
 
     options = __import__(option_file, globals(), locals(), [], 0)
@@ -71,7 +69,6 @@ def main(argv):
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
-    normfile_name = infile_path+infile_name+"_norm"
 
     #mapping of flavor labels used - set in create_graphs
     trk_flavor_labels = ['nm','b','c','btoc','p','s','o']
@@ -108,19 +105,6 @@ def main(argv):
         print("ERROR: Specified parameter file not found")
         return 1
     batches = int(math.ceil(test_len/batch_size))
-
-    #read in normalization parameters
-    if norm and os.path.isfile(normfile_name):
-        normfile = open(normfile_name, "r")
-        for i in range(10):
-            _ = normfile.readline()
-        jet_pt_mean = float(normfile.readline())
-        jet_pt_std = float(normfile.readline())
-        jet_eta_mean = float(normfile.readline())
-        jet_eta_std = float(normfile.readline())
-    elif norm:
-        print("ERROR: Specified norm file not found")
-        return 1
 
     bin_edges_one = np.linspace(-0.05,1.05,12)
     bin_edges_ntrk = np.linspace(-0.5,ntrk_bound+0.5,ntrk_bound+2)
@@ -225,9 +209,6 @@ def main(argv):
             pv_coord = np.array([g.ndata['jet_info'][0,1], g.ndata['jet_info'][0,2], g.ndata['jet_info'][0,3]])
             jet_pt = g.ndata['features_base'][0,5]
             jet_eta = g.ndata['features_base'][0,6]
-            if norm:
-                jet_pt = jet_pt*jet_pt_std+jet_pt_mean
-                jet_eta = jet_eta*jet_eta_std+jet_eta_mean
 
             gnn_vertices = find_vertices_bin(g, 'gnn', score_threshold)
             true_vertices = find_vertices_bin(g, 'truth', 0.9999)

@@ -9,9 +9,9 @@
 #cuts on data - PROCESSING
 jet_pt_cut = 20 #minimum required jet pT value (default: >20 GeV)
 jet_eta_cut = 2.5 #maximum allowed |jet eta| value (default <2.5)
-track_pt_cut = 0.5 #0.65 #minimum required track pT value
+track_pt_cut = 0.65 #0.65 #minimum required track pT value
 track_eta_cut = 2.5 #2.5 #maximum allowed |track eta| value (default: <2.5)
-track_z0_cut = 25. #20 #maximum allowed |track z0| value
+track_z0_cut = 20. #20 #maximum allowed |track z0| value
 vweight_pileup_cut = 1.0 #maximum allowed vertex weight value (pileup vertex association)
 vweight_pv_cut = 1.0 #maximum allowed vertex weight value (primary vertex association)
 
@@ -31,6 +31,9 @@ hit_features = ['pixhits', 'scthits', 'blhits', 'pixholes', 'sctholes', 'pixshar
 #neural network options - GNN
 use_gpu = True #toggle whether to use GPU for GNN training if available
 load_checkpoint = False #toggle whether to load previous neural network checkpoint (continue training from previous point)
+freeze_graphnn = False
+freeze_nodemlp = False
+freeze_edgemlp = False
 valp = 0.2 #fraction of data reserved for validation
 testp = 0.1 #fraction of data reserved for testing
 
@@ -45,14 +48,14 @@ bin_threshold = [0.5, 0.7] #threshold for recall of jets to be marked as bad in 
 score_threshold = 0.8 #threshold score for two edges to be associated to a reconstructed secondary vertex
 
 #neural network model parameters - GNN
-model_type = 'par' #choose model type - either 'mlp', 'gnn', 'par' or 'seq' (the latter two apply both, but either in parallel or in sequence)
+model_type = 'mix' #choose model type - either 'mlp', 'gnn', 'par' or 'seq' (the latter two apply both, but either in parallel or in sequence)
 gnn_type = 'gat' #choose gnn layer type - either 'gat' or 'gcn'
-attention_heads = [2, 2] #number of attention heads in GAT layers
+attention_heads = [3, 3] #number of attention heads in GAT layers
 nodemlp_sizes = [128, 128] #number of nodes in NodeMLP hidden layers
-gat_sizes = [512, 512] #layer sizes in GAT hidden layers (divided by number of attention heads for each layer)
+gat_sizes = [576, 576] #layer sizes in GAT hidden layers (divided by number of attention heads for each layer)
 edgemlp_sizes = [512, 256, 64] #excluding output features layer sizes in EdgeMLP hidden layers
 reweight = True #toggle whether positive labels in loss are reweighted to make positives and negatives equally important
-reweight_bin = 0.5 #scale relative imporance of positives/negatives
+reweight_bin = 0.1 #scale relative imporance of positives/negatives
 reweight_mult = [0.5, 0.5] #scale relative importance of b/negatives and c/negatives
 use_lr_scheduler = False #toggle whether to use learning rate schedule during training
 loss_a = 2

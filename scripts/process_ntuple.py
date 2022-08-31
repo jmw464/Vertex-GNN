@@ -40,12 +40,14 @@ def main(argv):
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="outfile_dir", help="name of output directory")
     parser.add_argument("-e", "--max_events", type=int, default=0, dest="max_events", help="maximum number of events to process")
     parser.add_argument("-v", "--events_per_file", type=int, default=10000, dest="events_per_file", help="number of events per output file")
+    parser.add_argument("-r", "--reprocess", type=int, default=0, dest="reprocess", help="choose whether to reprocess file completely")
     args = parser.parse_args()
 
     ntuple = TFile(args.infile_dir+args.ntuple+".root")
     tree = ntuple.Get(args.tree)
     max_events = args.max_events
     events_per_file = args.events_per_file
+    reprocess = args.reprocess
 
     #determine whether vertex weight is contained in ntuple
     sample_entry = tree.GetEntry(0)
@@ -135,10 +137,22 @@ def main(argv):
     if max_events == 0 or total_events < max_events:
         max_events = total_events
 
-    #process entries
+    #check howmany events were already processed
     ifile = 1
+    skip_events = 0
+    if not reprocess:
+        while os.path.exists(args.outfile_dir+args.ntuple+"_"+str(ifile).zfill(3)+".hdf5"):
+            current_file = h5py.File(args.outfile_dir+args.ntuple+"_"+str(ifile).zfill(3)+".hdf5", "r")
+            nevents = current_file['jinfo']['event_no'][-1]-current_file['jinfo']['event_no'][0]+1
+            skip_events += nevents
+            print("Current version of "+args.outfile_dir+args.ntuple+"_"+str(ifile).zfill(3)+".hdf5"+" already exists and contains "+str(nevents)+" events. Skipping file.")
+            ifile += 1
+
+    print("Skipping first {} events. Starting at event {}.".format(skip_events, skip_events+1))
+
+    #process entries
     for ientry,entry in enumerate(tree):
-        if ientry < max_events:
+        if ientry < max_events and ientry >= skip_events:
             njets = entry.njets
             particle_dict = build_particle_dict(entry)
             primary_vertex = np.array([entry.truth_PVx, entry.truth_PVy, entry.truth_PVz])
@@ -345,44 +359,36 @@ def main(argv):
 
                 for k in jinfo.keys():
                     grp_jinfo.create_dataset(k, data = jinfo[k])
-                    jinfo[k] = [] #reset dictionary
+                    jinfo[k].clear() #reset dictionary
                 for k in jfeatures.keys():
-                    jfeatures[k] = np.asarray(jfeatures[k], dtype=np.double)
-                    grp_jfeatures.create_dataset(k, data = jfeatures[k])
-                    jfeatures[k] = []
+                    grp_jfeatures.create_dataset(k, data = np.asarray(jfeatures[k], dtype=np.double))
+                    jfeatures[k].clear()
                 for k in tinfo.keys():
                     grp_tinfo.create_dataset(k, data = tinfo[k])
-                    tinfo[k] = []
+                    tinfo[k].clear()
                 for k in tfeatures_b.keys():
-                    tfeatures_b[k] = np.asarray(tfeatures_b[k], dtype=np.double)
-                    grp_tfeatures_b.create_dataset(k, data = tfeatures_b[k])
-                    tfeatures_b[k] = []
+                    grp_tfeatures_b.create_dataset(k, data = np.asarray(tfeatures_b[k], dtype=np.double))
+                    tfeatures_b[k].clear()
                 for k in tfeatures_e.keys():
-                    tfeatures_e[k] = np.asarray(tfeatures_e[k], dtype=np.double)
-                    grp_tfeatures_e.create_dataset(k, data = tfeatures_e[k])
-                    tfeatures_e[k] = []
+                    grp_tfeatures_e.create_dataset(k, data = np.asarray(tfeatures_e[k], dtype=np.double))
+                    tfeatures_e[k].clear()
                 for k in tfeatures_c.keys():
-                    tfeatures_c[k] = np.asarray(tfeatures_c[k], dtype=np.double)
-                    grp_tfeatures_c.create_dataset(k, data = tfeatures_c[k])
-                    tfeatures_c[k] = []
+                    grp_tfeatures_c.create_dataset(k, data = np.asarray(tfeatures_c[k], dtype=np.double))
+                    tfeatures_c[k].clear()
                 for k in tfeatures_h.keys():
-                    tfeatures_h[k] = np.asarray(tfeatures_h[k], dtype=np.double)
-                    grp_tfeatures_h.create_dataset(k, data = tfeatures_h[k])
-                    tfeatures_h[k] = []
+                    grp_tfeatures_h.create_dataset(k, data = np.asarray(tfeatures_h[k], dtype=np.double))
+                    tfeatures_h[k].clear()
                 if incl_vweight:
                     for k in tfeatures_w.keys():
-                        tfeatures_w[k] = np.asarray(tfeatures_w[k], dtype=np.double)
-                        grp_tfeatures_w.create_dataset(k, data = tfeatures_w[k])
-                        tfeatures_w[k] = []
+                        grp_tfeatures_w.create_dataset(k, data = np.asarray(tfeatures_w[k], dtype=np.double))
+                        tfeatures_w[k].clear()
                 for k in efeatures.keys():
-                    efeatures[k] = np.asarray(efeatures[k], dtype=np.double)
-                    grp_efeatures.create_dataset(k, data = efeatures[k])
-                    efeatures[k] = []
+                    grp_efeatures.create_dataset(k, data = np.asarray(efeatures[k], dtype=np.double))
+                    efeatures[k].clear()
 
                 ifile += 1
                 outfile.close()
-
-        else:
+        elif ientry > max_events:
             break
 
 

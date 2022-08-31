@@ -5,14 +5,13 @@
 # EDIT TO: update definition of edge labels (if modified in create_graphs)
 # -------------------------------------------Summary-------------------------------------------
 # This script is run as the final step in the processing chain and it requires DGL graph files
-# split into test/train/val dataset as input. These can come either directly from
-# "combine_graphs.py" or from "norm_graphs.py" if the features were normalized. The purpose of
-# this script is to remove tracks marked to be cut from all graphs in each dataset. Because
-# jet-level cuts are performed when the graphs are initially created, this script does not
-# change the number of graphs in each file (jets with fewer than 2 passing tracks are also
-# removed beforehand). Additionally, this script outputs a "paramfile" containing information
-# about the relative prevalence of each type of edge label in the training dataset, allowing
-# the GNN to re-weight labels during training.
+# split into test/train/val dataset as input. The purpose of this script is to remove tracks
+# marked to be cut from all graphs in each dataset. Because jet-level cuts are performed when
+# the graphs are initially created, this script does not change the number of graphs in each
+# file (jets with fewer than 2 passing tracks are also removed beforehand). Additionally, this
+# script outputs a "paramfile" containing information about the relative prevalence of each
+# type of edge label in the training dataset, allowing the GNN to re-weight labels during
+# training.
 ###############################################################################################
 
 
@@ -39,26 +38,19 @@ def main(argv):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="data_name", help="name of dataset to create (without hdf5 extension)")
-    parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
 
     args = parser.parse_args()
 
     data_path = args.data_dir
     data_name = args.data_name
-    use_normed = args.use_normed
 
     infile_prefix = data_path+data_name+"_"
-    if use_normed:
-        ext = '.normed'
-    else:
-        ext = ''
-
     total_true = total_edges = total_b = total_c = 0
 
     dataset_len = np.zeros(3)
     for i, dataset_type in enumerate(['train', 'val', 'test']):
         g_list = []
-        graphs = dgl.load_graphs(infile_prefix+dataset_type+ext+".bin")[0]
+        graphs = dgl.load_graphs(infile_prefix+dataset_type+".bin")[0]
         dataset_len[i] = len(graphs)
 
         for graph in graphs:
@@ -75,7 +67,7 @@ def main(argv):
             g_list.append(graph)
 
         random.shuffle(g_list)
-        dgl.save_graphs(infile_prefix+dataset_type+ext+'.pruned.bin', g_list)
+        dgl.save_graphs(infile_prefix+dataset_type+'.pruned.bin', g_list)
    
     #store important values in paramfile
     paramfile = open(infile_prefix+'params', "w")

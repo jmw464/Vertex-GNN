@@ -71,7 +71,6 @@ def main(argv):
     train_file_name = data_path+data_name+"_train.bin"
     val_file_name = data_path+data_name+"_val.bin"
     test_file_name = data_path+data_name+"_test.bin"
-    normfile_name = data_path+data_name+"_norm"
 
     train_graphs = dgl.load_graphs(train_file_name)[0]
 
@@ -196,19 +195,6 @@ def main(argv):
     prof_frac_reco_pt_c = TProfile("frac_reco_pt_c", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet pT;Jet fraction",20,jet_pt_bound[0],jet_pt_bound[1])
     prof_frac_reco_eta_b = TProfile("frac_reco_eta_b", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,-jet_eta_bound,jet_eta_bound)
     prof_frac_reco_eta_c = TProfile("frac_reco_eta_c", "Fraction of jets with matched tracks and GNN reconstructible vertices;Jet #eta;Jet fraction",20,-jet_eta_bound,jet_eta_bound)
-
-    #read in normalization constants for features
-    mean_features = np.zeros(nnfeatures)
-    std_features = np.zeros(nnfeatures)
-    if os.path.isfile(normfile_name):
-        normfile = open(normfile_name, "r")
-        counter = 0
-        for line in normfile:
-            if int(counter%2) == 0:
-                mean_features[int(counter/2)] = float(line)
-            else:
-                std_features[int((counter-1)/2)] = float(line)
-            counter += 1
 
     #fill histograms using testing, training and validation files
     filename_array = [train_file_name, val_file_name, test_file_name]
@@ -356,25 +342,25 @@ def main(argv):
     canv = TCanvas("c1", "c1", 800, 600)
 
     plot_confusion_matrix(jet_classification, ["l","b","c"], ["l","b","c"], "", ["Target jet classification", "Jet flavor label"], data_path+data_name+"_jet_cm.png")
-    plot_hist(canv, [hist_trk_pt_b, hist_trk_pt_btoc, hist_trk_pt_c, hist_trk_pt_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_pt.png", scaling=[mean_features[0],std_features[0]])
-    plot_hist(canv, [hist_trk_theta_b, hist_trk_theta_btoc, hist_trk_theta_c, hist_trk_theta_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_theta.png", scaling=[mean_features[1],std_features[1]])
-    plot_hist(canv, [hist_trk_phi_b, hist_trk_phi_btoc, hist_trk_phi_c, hist_trk_phi_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_phi.png", scaling=[mean_features[2],std_features[2]])
-    plot_hist(canv, [hist_trk_d0_b, hist_trk_d0_btoc, hist_trk_d0_c, hist_trk_d0_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_d0.png", scaling=[mean_features[3],std_features[3]])
-    plot_hist(canv, [hist_trk_z0_b, hist_trk_z0_btoc, hist_trk_z0_c, hist_trk_z0_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_z0.png", scaling=[mean_features[4],std_features[4]])
-    plot_hist(canv, [hist_jet_pt_b, hist_jet_pt_c, hist_jet_pt_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_pt.png", scaling=[mean_features[5],std_features[5]])
-    plot_hist(canv, [hist_jet_eta_b, hist_jet_eta_c, hist_jet_eta_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_eta.png", scaling=[mean_features[6],std_features[6]])
-    plot_hist(canv, [hist_jet_phi_b, hist_jet_phi_c, hist_jet_phi_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_phi.png", scaling=[mean_features[7],std_features[7]])
+    plot_hist(canv, [hist_trk_pt_b, hist_trk_pt_btoc, hist_trk_pt_c, hist_trk_pt_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_pt.png")
+    plot_hist(canv, [hist_trk_theta_b, hist_trk_theta_btoc, hist_trk_theta_c, hist_trk_theta_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_theta.png")
+    plot_hist(canv, [hist_trk_phi_b, hist_trk_phi_btoc, hist_trk_phi_c, hist_trk_phi_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_phi.png")
+    plot_hist(canv, [hist_trk_d0_b, hist_trk_d0_btoc, hist_trk_d0_c, hist_trk_d0_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_d0.png")
+    plot_hist(canv, [hist_trk_z0_b, hist_trk_z0_btoc, hist_trk_z0_c, hist_trk_z0_nohf], ["bH", "bH->cH", "prompt cH", "no HF"], cut_string, True, False, data_path+data_name+"_trk_z0.png")
+    plot_hist(canv, [hist_jet_pt_b, hist_jet_pt_c, hist_jet_pt_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_pt.png")
+    plot_hist(canv, [hist_jet_eta_b, hist_jet_eta_c, hist_jet_eta_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_eta.png")
+    plot_hist(canv, [hist_jet_phi_b, hist_jet_phi_c, hist_jet_phi_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_jet_phi.png")
     plot_hist(canv, [hist_no_trk_b, hist_no_trk_c, hist_no_trk_l], ["b", "c", "l"], cut_string, True, False, data_path+data_name+"_no_trk.png")
     plot_hist(canv, [hist_vertex_lxy_b, hist_vertex_lxy_c], ["b", "c"], cut_string, True, True, data_path+data_name+"_lxy.png")
     plot_profile(canv, [prof_frac_reco_pt_b, prof_frac_reco_pt_c], ["b", "c"], cut_string, data_path+data_name+"_frac_reco_pt.png")
     plot_profile(canv, [prof_frac_reco_eta_b, prof_frac_reco_eta_c], ["b", "c"], cut_string, data_path+data_name+"_frac_reco_eta.png")
 
     if incl_errors:
-        plot_hist(canv, [hist_trk_p_err_b, hist_trk_p_err_btoc, hist_trk_p_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_p_err.png", scaling=[mean_features[8],std_features[8]])
-        plot_hist(canv, [hist_trk_theta_err_b, hist_trk_theta_err_btoc, hist_trk_theta_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_theta_err.png", scaling=[mean_features[9],std_features[9]])
-        plot_hist(canv, [hist_trk_phi_err_b, hist_trk_phi_err_btoc, hist_trk_phi_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_phi_err.png", scaling=[mean_features[10],std_features[10]])
-        plot_hist(canv, [hist_trk_d0_err_b, hist_trk_d0_err_btoc, hist_trk_d0_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_d0_err.png", scaling=[mean_features[11],std_features[11]])
-        plot_hist(canv, [hist_trk_z0_err_b, hist_trk_z0_err_btoc, hist_trk_z0_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_z0_err.png", scaling=[mean_features[12],std_features[12]])
+        plot_hist(canv, [hist_trk_p_err_b, hist_trk_p_err_btoc, hist_trk_p_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_p_err.png")
+        plot_hist(canv, [hist_trk_theta_err_b, hist_trk_theta_err_btoc, hist_trk_theta_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_theta_err.png")
+        plot_hist(canv, [hist_trk_phi_err_b, hist_trk_phi_err_btoc, hist_trk_phi_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_phi_err.png")
+        plot_hist(canv, [hist_trk_d0_err_b, hist_trk_d0_err_btoc, hist_trk_d0_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_d0_err.png")
+        plot_hist(canv, [hist_trk_z0_err_b, hist_trk_z0_err_btoc, hist_trk_z0_err_c], ["bH", "bH->cH", "prompt cH"], cut_string, True, False, data_path+data_name+"_trk_z0_err.png")
 
     plot_hist(canv, [hist_acc_trk_pt_hf, hist_rej_trk_pt_hf], ["passed", "cut"], cut_string, False, True, data_path+data_name+"_cut_trk_pt_hf.png")
     plot_hist(canv, [hist_acc_trk_pt_nohf, hist_rej_trk_pt_nohf], ["passed", "cut"], cut_string, False, True, data_path+data_name+"_cut_trk_pt_nohf.png")

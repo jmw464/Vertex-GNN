@@ -225,24 +225,37 @@ def print_output(multi_class, cm, label):
 
 def print_weight_contribution(model, feature_list):
     separate_srcdst = True
-    gnnweights = mlpweights = None
+    gnnweights1 = gnnweights2 = gnnweights3 =  mlpweights = None
+    gnntype = ""
     for name, param in model.named_parameters():
-        if name == "gcn.conv1.fc.weight":
-            gnnweights = th.sum(th.abs(model.gcn.conv1.fc.weight), 0)/model.gcn.conv1.fc.weight.shape[0]
-        elif name == "gcn.conv1.weight":
-            gnnweights = th.sum(th.abs(model.gcn.conv1.weight), 0)/model.gcn.conv1.weight.shape[0]
-        elif name == "gcn.conv1.fc_src.weight":
-            gnnweights = th.sum((th.abs(model.gcn.conv1.fc_src.weight) + th.abs(model.gcn.conv1.fc_dst.weight)), 0)/(2*model.gcn.conv1.fc_src.weight.shape[0])
+        if name == "gcn.conv.0.fc.weight":
+            gnnweights1 = th.sum(th.abs(model.gcn.conv[0].fc.weight), 0)/model.gcn.conv[0].fc.weight.shape[0]
+            gnntype = "gatv1"
+        elif name == "gcn.conv.0.weight":
+            gnnweights1 = th.sum(th.abs(model.gcn.conv[0].weight), 0)/model.gcn.conv[0].weight.shape[0]
+            gnntype = "gcn"
+        elif name == "gcn.conv.0.fc_src.weight":
+            gnnweights1 = th.sum(th.abs(model.gcn.conv[0].fc_src.weight), 0)/model.gcn.conv[0].fc_src.weight.shape[0]
+            gnnweights2 = th.sum(th.abs(model.gcn.conv[0].fc_dst.weight), 0)/model.gcn.conv[0].fc_dst.weight.shape[0]
+            gnntype = "gatv2"
+        elif name == "gcn.conv.0.fc_src_mut.weight":
+            gnnweights1 = th.sum(th.abs(model.gcn.conv[0].fc_src_mut.weight), 0)/model.gcn.conv[0].fc_src_mut.weight.shape[0]
+            gnnweights2 = th.sum(th.abs(model.gcn.conv[0].fc_dst_mut.weight), 0)/model.gcn.conv[0].fc_dst_mut.weight.shape[0]
+            gnnweights3 = th.sum(th.abs(model.gcn.conv[0].fc_src_self.weight), 0)/model.gcn.conv[0].fc_src_self.weight.shape[0]
+            gnntype = "gatv3"
         elif name == "nodemlp.lin.0.weight":
             mlpweights = th.sum(th.abs(model.nodemlp.lin[0].weight), 0)/model.nodemlp.lin[0].weight.shape[0]
     
     print("Printing average of absolute value of weights associated with each feature in first network layer:")
-    if gnnweights != None and mlpweights != None:
-        for i,feature in enumerate(feature_list):
-            print(feature+": {} (NodeMLP), {} (GraphNN)".format(mlpweights[i], gnnweights[i]))
-    elif gnnweights != None:
-        for i,feature in enumerate(feature_list):
-            print(feature+": {} (GraphNN)".format(gnnweights[i]))
-    elif mlpweights != None:
-        for i,feature in enumerate(feature_list):
+    for i, feature in enumerate(feature_list):
+        if gnntype == "" and mlpweights != None:
             print(feature+": {} (NodeMLP)".format(mlpweights[i]))
+        elif gnntype == "gcn" or gnntype == "gatv1":
+            if mlpweights != None: print(feature+": {} (NodeMLP), {} (GraphNN)".format(mlpweights[i], gnnweights1[i]))
+            else: print(feature+": {} (GraphNN)".format(gnnweights1[i]))
+        elif gnntype == "gatv2":
+            if mlpweights != None: print(feature+": {} (NodeMLP), {} (GraphNN src), {} (GraphNN dst)".format(mlpweights[i], gnnweights1[i], gnnweights2[i]))
+            else: print(feature+": {} (GraphNN src), {} (GraphNN dst)".format(gnnweights1[i], gnnweights2[i]))
+        elif gnntype == "gatv3":
+            if mlpweights != None: print(feature+": {} (NodeMLP), {} (GraphNN src mut), {} (GraphNN dst mut), {} (GraphNN self)".format(mlpweights[i], gnnweights1[i], gnnweights2[i], gnnweights3[i]))
+            else: print(feature+": {} (GraphNN src mut), {} (GraphNN dst mut), {} (GraphNN self)".format(gnnweights1[i], gnnweights2[i], gnnweights3[i]))

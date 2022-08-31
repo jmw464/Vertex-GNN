@@ -47,7 +47,6 @@ def main(argv):
     parser.add_argument("-d", "--data_dir", type=str, required=True, dest="data_dir", help="name of directory where data is stored")
     parser.add_argument("-o", "--output_dir", type=str, required=True, dest="output_dir", help="name of directory where GNN output is stored")
     parser.add_argument("-s", "--dataset", type=str, required=True, dest="infile_name", help="name of dataset to train on (without hdf5 extension)")
-    parser.add_argument("-n", "--normed", type=int, default=1, dest="use_normed", help="choose whether to use normalized features or not")
     parser.add_argument("-m", "--multiclass", type=int, default=0, dest="multi_class", help="choose whether to perform binary of multi-class classification")
     parser.add_argument("-f", "--options", type=str, required=True, dest="option_file", help="name of file containing script options")
     args = parser.parse_args()
@@ -57,14 +56,13 @@ def main(argv):
     infile_name = args.infile_name
     infile_path = args.data_dir
     outfile_path = args.output_dir
-    use_normed = args.use_normed
     multi_class = args.multi_class
     option_file = args.option_file
 
     options = __import__(option_file, globals(), locals(), [], 0)
 
     #import options from option file
-    use_gpu = options.learning_rate
+    use_gpu = options.use_gpu
     learning_rate = options.learning_rate
     batch_size = options.batch_size
     dropout = options.dropout
@@ -76,6 +74,9 @@ def main(argv):
     reweight_bin = options.reweight_bin
     reweight_mult = options.reweight_mult
     load_checkpoint = options.load_checkpoint
+    freeze_graphnn = options.freeze_graphnn
+    freeze_nodemlp = options.freeze_nodemlp
+    freeze_edgemlp = options.freeze_edgemlp
     use_lr_scheduler = options.use_lr_scheduler
     loss_a = options.loss_a
     loss_b = options.loss_b
@@ -94,14 +95,10 @@ def main(argv):
     print("Importing input data.", flush=True)
     
     #set relevant filenames
-    if use_normed:
-        ext = ".normed.pruned"
-    else:
-        ext = ".pruned"
     paramfile_name = infile_path+infile_name+"_params"
-    train_infile_name = infile_path+infile_name+"_train"+ext+".bin"
-    val_infile_name = infile_path+infile_name+"_val"+ext+".bin"
-    test_infile_name = infile_path+infile_name+"_test"+ext+".bin"
+    train_infile_name = infile_path+infile_name+"_train.pruned.bin"
+    val_infile_name = infile_path+infile_name+"_val.pruned.bin"
+    test_infile_name = infile_path+infile_name+"_test.pruned.bin"
     checkpointfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_model.pt"
 
     #calculate number of features in graphs
@@ -169,7 +166,7 @@ def main(argv):
 
     #set up loss
     if not multi_class:
-        loss = lambda x, y, z: bin_loss(x, y, z, pos_weight, loss_a, loss_b, device) #nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='sum')
+        loss = lambda x, y, z: bin_loss(x, y, z, pos_weight, loss_a, loss_b, device)
         outfeats = 1
         cm = np.zeros((2,2),dtype=int)
         activation = nn.Sigmoid()
@@ -186,15 +183,9 @@ def main(argv):
     model = EdgePredModel(model_type, gnn_type, nodemlp_sizes, gat_sizes, edgemlp_sizes, in_features, outfeats, attention_heads, dropout).double().to(device)
     opt = th.optim.Adam(model.parameters(), lr=learning_rate)
     if use_lr_scheduler: scheduler = th.optim.lr_scheduler.OneCycleLR(opt,0.1, epochs=nepochs, steps_per_epoch=train_batches) #th.optim.lr_scheduler.ReduceLROnPlateau(opt,patience=5)
-        
+
     train_loss_array = np.zeros(nepochs)
     val_loss_array = np.zeros(nepochs)
-
-    #print model parameters
-    print("Model built. Parameters:", flush=True)
-    for name, param in model.named_parameters():
-        print(name, param.size(), param.requires_grad, flush=True)
-    print("", flush=True)
 
     #load existing checkpoint
     if load_checkpoint and os.path.exists(checkpointfile_name):
@@ -205,6 +196,19 @@ def main(argv):
         print("Loading previous model. Starting from epoch {}.".format(start_epoch), flush=True)
     else:
         start_epoch = 1
+
+    #print model parameters
+    print("Model built. Parameters:", flush=True)
+    for name, param in model.named_parameters():
+        param.requires_grad = True
+        if freeze_graphnn and "gcn" in name:
+            param.requires_grad = False
+        if freeze_nodemlp and "nodemlp" in name:
+            param.requires_grad = False
+        if freeze_edgemlp and "edgemlp" in name:
+            param.requries_grad = False
+        print(name, param.size(), param.requires_grad, flush=True)
+    print("", flush=True)
 
     #initialize multiprocessing on GPUs
     #if th.cuda.is_available():

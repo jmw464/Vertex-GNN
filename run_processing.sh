@@ -6,21 +6,20 @@
 #SBATCH --error=proc_%j.err
 #SBATCH --output=proc_%j.out
 
-NTUPLES="user.jmwagner.27266826.Akt4EMPf_BTagging201903._000006 user.jmwagner.27266824.Akt4EMPf_BTagging201903._000006"
-DATADIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
-DATANAME=btag_zh06_tt06_cut_v7_1
+NTUPLES="user.jmwagner.29159347.Akt4EMPf_BTagging201903._000001 user.jmwagner.29159347.Akt4EMPf_BTagging201903._000002 user.jmwagner.29159347.Akt4EMPf_BTagging201903._000003 user.jmwagner.29152222.Akt4EMPf_BTagging201903._000001 user.jmwagner.29152222.Akt4EMPf_BTagging201903._000002 user.jmwagner.29152222.Akt4EMPf_BTagging201903._000003"
+INDIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/NTUPLE/
+OUTDIR=/global/cfs/cdirs/atlas/jmw464/gnn_data/
+SAMPLE=btag_zh_tt_2m_v1
 OPTIONFILE=options
 
 ENVNAME=dgl-env #name of conda environment that contains packages
 
-ENTRIES=( 300000 300000 ) #jets used per file (after cuts)
-
-NORMED=0
+ENTRIES=( 0 0 0 0 0 0 ) #jets used per file (after cuts)
 
 #create output directory if not already there
-if [ ! -d ${DATADIR}${DATANAME}/ ]
+if [ ! -d ${OUTDIR}${SAMPLE}/ ]
 then
-	mkdir ${DATADIR}${DATANAME}/
+	mkdir ${OUTDIR}${SAMPLE}/
 fi
 
 if [ "$YN" == "N" ] || [ "$YN" == "n" ]
@@ -36,23 +35,16 @@ file_counter=0
 for NTUPLE in $NTUPLES
 do
 	printf "Running create_graphs.py to transform ${NTUPLE}.hdf5 into GNN compatible data\n\n"
-	#python scripts/create_graphs.py -n ${NTUPLE} -i ${DATADIR} -o ${DATADIR}${DATANAME}/ -e ${ENTRIES[$file_counter]} -d ${DATANAME} -f options/${OPTIONFILE}
+	#python scripts/create_graphs.py -n ${NTUPLE} -i ${INDIR} -o ${OUTDIR}${SAMPLE}/ -e ${ENTRIES[$file_counter]} -d ${SAMPLE} -f ${OPTIONFILE}
 	printf "\n"
 	file_counter=$(expr $file_counter + 1)
 done
 
 printf "Running combine_graphs.py to combine individual files\n\n"
-#python scripts/combine_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n "$NTUPLES" -f options/${OPTIONFILE}
-	
-if [[ $NORMED != 0 ]]
-then
-	printf "Running norm_graphs.py to normalize graphs based on training dataset\n\n"
-	python scripts/norm_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME
-	printf "\n"
-fi
+#python scripts/combine_graphs.py -d ${OUTDIR}${SAMPLE}/ -s $SAMPLE -n "$NTUPLES" -f ${OPTIONFILE}
 
 printf "Running plot_data.py to generate plots\n\n"
-#python scripts/plot_data.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -f options/${OPTIONFILE}
+#python scripts/plot_data.py -d ${OUTDIR}${SAMPLE}/ -s $SAMPLE -f ${OPTIONFILE}
 
 printf "Running prune_graphs.py to remove cut tracks\n\n"
-python scripts/prune_graphs.py -d ${DATADIR}${DATANAME}/ -s $DATANAME -n $NORMED
+python scripts/prune_graphs.py -d ${OUTDIR}${SAMPLE}/ -s $SAMPLE

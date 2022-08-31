@@ -65,7 +65,6 @@ def main(argv):
     graphfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber+"_results.bin"
     paramfile_name = infile_path+infile_name+"_params"
     outfile_name = outfile_path+runnumber+"/"+infile_name+"_"+runnumber
-    normfile_name = infile_path+infile_name+"_norm"
 
     #calculate number of features in graphs
     sample_graph = (dgl.load_graphs(graphfile_name, [0]))[0][0]
@@ -175,20 +174,6 @@ def main(argv):
         hist_s_list = [neg_score_hist, b_score_hist, c_score_hist]
         s_labels = ["negative score", "b score", "c score"]
 
-    #read in normalization constants for features
-    if os.path.isfile(normfile_name):
-        normfile = open(normfile_name, "r")
-        mean_features = np.zeros(nnfeatures)
-        std_features = np.zeros(nnfeatures) 
-        
-        counter = 0
-        for line in normfile:
-            if int(counter%2) == 0:
-                mean_features[int(counter/2)] = float(line)
-            else:
-                std_features[int((counter-1)/2)] = float(line)
-            counter += 1
-
     #initialize overall bad events matrix
     bad_events = np.empty((0,3), dtype=int)
 
@@ -244,43 +229,43 @@ def main(argv):
                     nm_trk += 1
                 elif track_labels[i] == 1:
                     b_trk += 1
-                    hist_trk_pt_b_tot.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                    hist_trk_theta_b_tot.Fill(features[i,1]*std_features[1]+mean_features[1])
-                    hist_trk_phi_b_tot.Fill(features[i,2]*std_features[2]+mean_features[2])
-                    hist_trk_d0_b_tot.Fill(features[i,3]*std_features[3]+mean_features[3])
-                    hist_trk_z0_b_tot.Fill(features[i,4]*std_features[4]+mean_features[4])
+                    hist_trk_pt_b_tot.Fill(abs(1/features[i,0]))
+                    hist_trk_theta_b_tot.Fill(features[i,1])
+                    hist_trk_phi_b_tot.Fill(features[i,2])
+                    hist_trk_d0_b_tot.Fill(features[i,3])
+                    hist_trk_z0_b_tot.Fill(features[i,4])
                     if bad_jet:
-                        hist_trk_pt_b_bad.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                        hist_trk_theta_b_bad.Fill(features[i,1]*std_features[1]+mean_features[1])
-                        hist_trk_phi_b_bad.Fill(features[i,2]*std_features[2]+mean_features[2])
-                        hist_trk_d0_b_bad.Fill(features[i,3]*std_features[3]+mean_features[3])
-                        hist_trk_z0_b_bad.Fill(features[i,4]*std_features[4]+mean_features[4])
+                        hist_trk_pt_b_bad.Fill(abs(1/features[i,0]))
+                        hist_trk_theta_b_bad.Fill(features[i,1])
+                        hist_trk_phi_b_bad.Fill(features[i,2])
+                        hist_trk_d0_b_bad.Fill(features[i,3])
+                        hist_trk_z0_b_bad.Fill(features[i,4])
                 elif track_labels[i] == 2:
                     c_trk += 1
-                    hist_trk_pt_c_tot.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                    hist_trk_theta_c_tot.Fill(features[i,1]*std_features[1]+mean_features[1])
-                    hist_trk_phi_c_tot.Fill(features[i,2]*std_features[2]+mean_features[2])
-                    hist_trk_d0_c_tot.Fill(features[i,3]*std_features[3]+mean_features[3])
-                    hist_trk_z0_c_tot.Fill(features[i,4]*std_features[4]+mean_features[4])
+                    hist_trk_pt_c_tot.Fill(abs(1/features[i,0]))
+                    hist_trk_theta_c_tot.Fill(features[i,1])
+                    hist_trk_phi_c_tot.Fill(features[i,2])
+                    hist_trk_d0_c_tot.Fill(features[i,3])
+                    hist_trk_z0_c_tot.Fill(features[i,4])
                     if bad_jet:
-                        hist_trk_pt_c_bad.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                        hist_trk_theta_c_bad.Fill(features[i,1]*std_features[1]+mean_features[1])
-                        hist_trk_phi_c_bad.Fill(features[i,2]*std_features[2]+mean_features[2])
-                        hist_trk_d0_c_bad.Fill(features[i,3]*std_features[3]+mean_features[3])
-                        hist_trk_z0_c_bad.Fill(features[i,4]*std_features[4]+mean_features[4])
+                        hist_trk_pt_c_bad.Fill(abs(1/features[i,0]))
+                        hist_trk_theta_c_bad.Fill(features[i,1])
+                        hist_trk_phi_c_bad.Fill(features[i,2])
+                        hist_trk_d0_c_bad.Fill(features[i,3])
+                        hist_trk_z0_c_bad.Fill(features[i,4])
                 elif track_labels[i] == 3:
                     btoc_trk += 1
-                    hist_trk_pt_btoc_tot.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                    hist_trk_theta_btoc_tot.Fill(features[i,1]*std_features[1]+mean_features[1])
-                    hist_trk_phi_btoc_tot.Fill(features[i,2]*std_features[2]+mean_features[2])
-                    hist_trk_d0_btoc_tot.Fill(features[i,3]*std_features[3]+mean_features[3])
-                    hist_trk_z0_btoc_tot.Fill(features[i,4]*std_features[4]+mean_features[4])
+                    hist_trk_pt_btoc_tot.Fill(abs(1/features[i,0]))
+                    hist_trk_theta_btoc_tot.Fill(features[i,1])
+                    hist_trk_phi_btoc_tot.Fill(features[i,2])
+                    hist_trk_d0_btoc_tot.Fill(features[i,3])
+                    hist_trk_z0_btoc_tot.Fill(features[i,4])
                     if bad_jet:
-                        hist_trk_pt_btoc_bad.Fill(abs(1/(features[i,0]*std_features[0]+mean_features[0])))
-                        hist_trk_theta_btoc_bad.Fill(features[i,1]*std_features[1]+mean_features[1])
-                        hist_trk_phi_btoc_bad.Fill(features[i,2]*std_features[2]+mean_features[2])
-                        hist_trk_d0_btoc_bad.Fill(features[i,3]*std_features[3]+mean_features[3])
-                        hist_trk_z0_btoc_bad.Fill(features[i,4]*std_features[4]+mean_features[4])
+                        hist_trk_pt_btoc_bad.Fill(abs(1/features[i,0]))
+                        hist_trk_theta_btoc_bad.Fill(features[i,1])
+                        hist_trk_phi_btoc_bad.Fill(features[i,2])
+                        hist_trk_d0_btoc_bad.Fill(features[i,3])
+                        hist_trk_z0_btoc_bad.Fill(features[i,4])
                 else:
                     nohf_trk += 1
 
